@@ -13,10 +13,9 @@ struct Color
 
 class MassCenter
 {
-    protected:
+    public:
         int X;
         int Y;
-    public:
         MassCenter(Rect Rectangle);
         MassCenter(MassCenter Center1, MassCenter Center2);
 };
@@ -27,10 +26,9 @@ class MovementCalculation
         float AngleInRadian;
         int DistanceInPixel;
 
-        float findAngle(MassCenter blob1, MassCenter blob2, Point2i Destination);
-        int findDistanceToDestination(MassCenter AverageCenter, Point2i Destination);
+        void findAngle(MassCenter blob1, MassCenter blob2, Point2i Destination);
+        void findDistanceToDestination(MassCenter AverageCenter, Point2i Destination);
 
-        Rect detectBlob(Mat Frame, Color c);
 };
 
 int main()
@@ -42,19 +40,32 @@ int main()
 
 MassCenter::MassCenter(Rect Rectangle)
 {
-    Point TopLeftPointRect = Rectangle.tl();
-    Point BottomRightPointRect = Rectangle.br();
+    Point2i TopLeftPointRect = Rectangle.tl();
+    Point2i BottomRightPointRect = Rectangle.br();
     this->X = (TopLeftPointRect.x + BottomRightPointRect.x)/2;
     this->Y = (TopLeftPointRect.y + BottomRightPointRect.y)/2;
 }
 
 MassCenter::MassCenter(MassCenter Center1, MassCenter Center2)
 {
-    this->X = (Center1.x + Center2.x)/2;
-    this->Y = (Center1.y + Center2.y)/2;
+    this->X = (Center1.X + Center2.X)/2;
+    this->Y = (Center1.Y + Center2.Y)/2;
 }
 
-Rect MovementCalculation::detectBlob(Mat Frame, Color c)
+void MovementCalculation::findAngle(MassCenter blob1, MassCenter blob2, Point2i Dest)
+{
+    int CenterX = int(blob1.X + blob2.X)/2;
+    int CenterY = int(blob1.Y + blob2.Y)/2;
+    this -> AngleInRadian = ((blob1.X - CenterX) * (CenterX - Dest.x) + (blob1.Y - CenterY) * (CenterY - Dest.y))/
+                            (sqrt(pow((blob1.X - CenterX), 2) + pow((blob1.Y - CenterY), 2)) * sqrt(pow((CenterX - Dest.x), 2) + pow((CenterY - Dest.y), 2)));
+}
+
+void MovementCalculation::findDistanceToDestination(MassCenter AverageCenter, Point2i Dest)
+{
+    this -> DistanceInPixel = (AverageCenter.X - Dest.x) - (AverageCenter.Y - Dest.y);
+}
+
+Rect detectBlob(Mat Frame, Color c)
 {
     
 }
