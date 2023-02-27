@@ -18,11 +18,12 @@ class MassCenter
         int Y;
     public:
         MassCenter(Rect Rectangle);
-        MassCenter(MassCenter Cntr1, MassCenter Cntr2);
+        MassCenter(MassCenter Center1, MassCenter Center2);
 };
 
 class MovementCalculation
 {
+    public:
         float AngleInRadian;
         int DistanceInPixel;
 
@@ -37,4 +38,23 @@ int main()
     cout << "Hello Robot!" << endl;
 
     return 0;
+}
+
+MassCenter::MassCenter(Rect Rectangle)
+{
+    Point TopLeftPointRect = Rectangle.tl();
+    Point BottomRightPointRect = Rectangle.br();
+    this->X = (TopLeftPointRect.x + BottomRightPointRect.x)/2;
+    this->Y = (TopLeftPointRect.y + BottomRightPointRect.y)/2;
+}
+
+MassCenter::MassCenter(MassCenter Center1, MassCenter Center2)
+{
+    this->X = (Center1.x + Center2.x)/2;
+    this->Y = (Center1.y + Center2.y)/2;
+}
+
+Rect MovementCalculation::detectBlob(Mat Frame, Color c)
+{
+    
 }
