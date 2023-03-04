@@ -1,5 +1,7 @@
 #include "opencv2/opencv.hpp"
 #include <iostream>
+#include <math.h>
+#include <queue>
 
 using namespace std;
 using namespace cv;
@@ -9,11 +11,24 @@ struct Color
     uint8_t Hue = 0;
     uint8_t Saturation = 0;
     uint8_t Value = 0;
+    Color(const Color & other)
+    {
+        this->Hue = other.Hue;
+        this->Saturation = other.Saturation;
+        this->Value = other.Value;
+    }
     Color(uint8_t H, uint8_t S, uint8_t V)
     {
         Hue = H;
         Saturation = S;
         Value = V;
+    }
+    Color &operator = (Color& other)
+    {
+        this->Hue = other.Hue;
+        this->Saturation = other.Saturation;
+        this->Value = other.Value;
+        return *this;
     }
 
 }BlueHSV(100,90,70), MagentaHSV(167, 80, 90);
@@ -34,7 +49,67 @@ class MovementCalculation
         int DistanceInPixel;
         void findAngle(MassCenter blob1, MassCenter blob2, Point2i Destination);
         void findDistanceToDestination(MassCenter AverageCenter, Point2i Destination);
+        float GetAngle(){ return AngleInRadian; };
+        int GetDistance(){ return DistanceInPixel; };
 
+};
+
+enum class TypesOfRequest 
+{
+    System = -1, 
+    None = 0, 
+    Deliver
+    };
+class Request
+{
+    public:
+        Point2i Destination {960,1280};
+        TypesOfRequest Type;
+        Color ColorPuf{0,0,0};
+        Request()
+        {
+            this->Type = TypesOfRequest::None;
+        }
+        Request(Color ColorPuf, TypesOfRequest Type = TypesOfRequest::None)
+        {
+            this->Type = Type;
+            this->ColorPuf = ColorPuf;
+        }
+        Request &operator = (Request &req)
+        {
+            this->ColorPuf = req.ColorPuf;
+            this->Type = req.Type;
+            return *this;
+        }
+        TypesOfRequest GetType(){ return Type; }
+};
+
+class Controller
+{
+    public:
+        void MakeRequest(Request &Req, Color ColorPuf, TypesOfRequest Type)
+        {
+            Req.ColorPuf = ColorPuf;
+            Req.Type = Type;
+        }
+        void FinishRequest(Request &Req)
+        {
+            Req.Type = TypesOfRequest::None;
+        }
+        void Move(int Distance)
+        {
+            cout << "Moving " << Distance << endl;
+            cout << "Movement Completed!" << endl;
+        }
+        void Rotate(float Angle)
+        {
+            cout << "Rotating to " << Angle*180/M_PIf << endl;
+            cout << "Rotation Completed!" << endl;
+        }
+        void GoHome()
+        {
+            cout << "Going Home.." << endl;
+        }
 };
 
 MassCenter::MassCenter(Rect Rectangle)
@@ -55,13 +130,13 @@ void MovementCalculation::findAngle(MassCenter blob1, MassCenter blob2, Point2i 
 {
     int CenterX = int(blob1.X + blob2.X)/2;
     int CenterY = int(blob1.Y + blob2.Y)/2;
-    this -> AngleInRadian = ((blob1.X - CenterX) * (CenterX - Dest.x) + (blob1.Y - CenterY) * (CenterY - Dest.y))/
-                            (sqrt(pow((blob1.X - CenterX), 2) + pow((blob1.Y - CenterY), 2)) * sqrt(pow((CenterX - Dest.x), 2) + pow((CenterY - Dest.y), 2)));
+    this -> AngleInRadian = static_cast<float>(acos(((blob1.X - CenterX) * (CenterX - Dest.x) + (blob1.Y - CenterY) * (CenterY - Dest.y))/
+                            (sqrt(pow((blob1.X - CenterX), 2) + pow((blob1.Y - CenterY), 2)) * sqrt(pow((CenterX - Dest.x), 2) + pow((CenterY - Dest.y), 2)))));
 }
 
 void MovementCalculation::findDistanceToDestination(MassCenter AverageCenter, Point2i Dest)
 {
-    this -> DistanceInPixel = (AverageCenter.X - Dest.x) - (AverageCenter.Y - Dest.y);
+    this -> DistanceInPixel = sqrt(pow((AverageCenter.X - Dest.x),2) + pow((AverageCenter.Y - Dest.y),2));
 }
 
 void SetColor(Mat Frame)
@@ -146,28 +221,132 @@ Rect detectBlob(Mat Threshold)
 
 int main()
 {
-    Mat Frame = imread("img_0.jpg");
-    Mat FrameHSV;
-    //converting the Frame to FrameHsv color model
-    cvtColor(Frame, FrameHSV, COLOR_BGR2HSV);
-    Point2i Destination(960,1280);
-    Mat Threshold = TakeThresholdOfBlob(FrameHSV, MagentaHSV);
-    Rect RectangleOfMagenta = detectBlob(Threshold);
-    //just for tests
-    // cout << RectangleOfMagenta << endl;
+    enum States{
+        Running = 1,
+        DoDeliver,
+        Move,
+        Rotate,
+        Waiting,
+        Disabling
+    }State {Running};
 
-    Threshold = TakeThresholdOfBlob(FrameHSV,BlueHSV);
-    Rect RectangleOfBlue = detectBlob(Threshold);
-    //just for tests
-    // cout << RectangleOfBlue << endl;
-
-    MassCenter MCBlue(RectangleOfBlue);
-    MassCenter MCMagenta(RectangleOfMagenta);
-    MassCenter MCAverage(MCBlue, MCMagenta);    
+    Request Request;
+    Controller Controller;
+    Mat Frame, FrameHSV, Threshold;
+    Rect RectangleOfMagenta, RectangleOfBlue;
     MovementCalculation MoveBot;
-    MoveBot.findAngle(MCBlue, MCMagenta, Destination);
-    MoveBot.findDistanceToDestination(MCAverage, Destination);
-    cout << "Angle: " << MoveBot.AngleInRadian << " Distance: " << MoveBot.DistanceInPixel << endl;
+
+    MoveBot.AngleInRadian = -0.685;
+    MoveBot.DistanceInPixel = 555;
+    // VideoCapture cap("Cap");
+    //Deviation for if`s
+    float ErrorAngle = 0.1;
+    int ErrorDist = 100;
+    
+    while(true)
+    {
+        switch(State)
+        {
+            case Running:
+            {
+                //Making a request
+                char c;
+                cin >> c;
+                if(c=='d')
+                {
+                    int Hue = 0, Saturation = 0, Value = 0;
+                    cout << "Hue: ";
+                    cin >> Hue;
+                    cout << "Saturation: ";
+                    cin >> Saturation;
+                    cout << "Value: ";
+                    cin >> Value;
+
+                    Color ColorPuf(Hue, Saturation, Value);
+                    
+                    Controller.MakeRequest(Request, ColorPuf, TypesOfRequest::Deliver);
+                }
+
+                if(Request.GetType() == TypesOfRequest::System)
+                    State = Disabling;
+                else if(Request.GetType() == TypesOfRequest::Deliver)
+                    State = DoDeliver;
+                else
+                    Controller.GoHome();
+                break;
+            }
+            case DoDeliver:
+            {
+            // Capture frame-by-frame
+                // cap >> frame;
+            
+            // If the frame is empty, break immediately
+                // if (Frame.empty())
+                //   State = Running;
+
+            //Imitation of capturing camera
+
+                Frame = imread("img_0.jpg");
+                
+            //converting the Frame to FrameHsv color model
+                cvtColor(Frame, FrameHSV, COLOR_BGR2HSV);
+                
+
+                Threshold = TakeThresholdOfBlob(FrameHSV, MagentaHSV);
+                RectangleOfMagenta = detectBlob(Threshold);
+            //just for tests
+                // cout << RectangleOfMagenta << endl;
+
+                Threshold = TakeThresholdOfBlob(FrameHSV,BlueHSV);
+                Rect RectangleOfBlue = detectBlob(Threshold);
+            //just for tests
+                // cout << RectangleOfBlue << endl;
+
+                MassCenter MCBlue(RectangleOfBlue);
+                MassCenter MCMagenta(RectangleOfMagenta);
+                MassCenter MCAverage(MCBlue, MCMagenta);    
+                
+                // MoveBot.findAngle(MCBlue, MCMagenta, Request.Destination);
+                // MoveBot.findDistanceToDestination(MCAverage, Request.Destination);
+                if(MoveBot.GetAngle() > ErrorAngle || MoveBot.GetAngle() < (-ErrorAngle))
+                    {
+                        State = Rotate;
+                        cout << "ifRotate";
+                        break;
+                    }
+
+                if(MoveBot.GetDistance() > ErrorDist)
+                    {
+                        State = Move;
+                        break;
+                    }
+                    else
+                    {
+                        State = Waiting;
+                        break;
+                    }
+
+                break;
+            }
+
+            case Move:
+                State = DoDeliver;
+                Controller.Move(MoveBot.GetDistance());
+                MoveBot.DistanceInPixel = 0;
+                break;
+
+            case Rotate:
+                State = DoDeliver;
+                Controller.Rotate(MoveBot.GetAngle());
+                MoveBot.AngleInRadian = 0;
+                break;
+
+            case Waiting:
+                State = Running;
+                Controller.FinishRequest(Request);
+                break;
+        }
+    }
 
     return 0;
 }
