@@ -1,57 +1,103 @@
 #include "opencv2/opencv.hpp"
+#include "opencv2/viz/types.hpp"
 #include <iostream>
 #include <math.h>
 #include <queue>
 
 using namespace std;
 using namespace cv;
+using namespace viz;
 
-struct Color
+Point2i GetMassCenter(Rect Rectangle)
 {
-    uint8_t Hue = 0;
-    uint8_t Saturation = 0;
-    uint8_t Value = 0;
-    Color(const Color & other)
-    {
-        this->Hue = other.Hue;
-        this->Saturation = other.Saturation;
-        this->Value = other.Value;
-    }
-    Color(uint8_t H, uint8_t S, uint8_t V)
-    {
-        Hue = H;
-        Saturation = S;
-        Value = V;
-    }
-    Color &operator = (Color& other)
-    {
-        this->Hue = other.Hue;
-        this->Saturation = other.Saturation;
-        this->Value = other.Value;
-        return *this;
-    }
+    Point2i TopLeftPointRect = Rectangle.tl();
+    Point2i BottomRightPointRect = Rectangle.br();
+    int X = (TopLeftPointRect.x + BottomRightPointRect.x)/2;
+    int Y = (TopLeftPointRect.y + BottomRightPointRect.y)/2;
+    return Point2i(X, Y);
+}
 
-}BlueHSV(100,90,70), MagentaHSV(167, 80, 90);
-
-class MassCenter
+Point2i GetMassCenter(Point2i *Center1, Point2i *Center2)
 {
-    public:
-        int X;
-        int Y;
-        MassCenter(Rect Rectangle);
-        MassCenter(MassCenter Center1, MassCenter Center2);
-};
+    int X = (Center1->x + Center2->x) / 2;
+    int Y = (Center1->y + Center2->y) / 2;
+    return Point2i(X, Y);
+}
+
+Mat TakeThresholdOfBlob(const Mat &FrameHSV, Color Color)
+{
+    Mat Threshold;
+    //vectors of HSV color that need to find. Make a range using Offset
+    uint8_t Offset = 5;
+    vector <uint8_t> HsvMin = {static_cast<uint8_t>(Color[0] - Offset),100,100};
+    vector <uint8_t> HsvMax = {static_cast<uint8_t>(Color[0] + Offset),255,255};
+    
+    //Make result image matrix with found color
+    inRange(FrameHSV, HsvMin, HsvMax, Threshold);
+    //Creating the image in white&black with area of needed color 
+    // imwrite( "FrameResult.jpg", Threshold );
+    return Threshold;
+}
+
+Rect detectBlob(const Mat &Threshold)
+{
+    Rect Rectangle;
+    vector<vector<Point>> Contours;
+    vector<Vec4i> Hierarchy;
+
+    findContours(Threshold, Contours, RETR_TREE, CHAIN_APPROX_SIMPLE);
+    
+    vector<RotatedRect> minRect(Contours.size());
+    for(size_t i = 0; i < Contours.size(); i++)
+            minRect[i] = minAreaRect(Contours[i]);
+    
+    for(size_t i = 0; i < Contours.size(); i++)
+    {
+        int area = minRect[i].size.height*minRect[i].size.width;
+        int minArea = 10'000;
+        if(area > minArea)
+        {
+            Rectangle = minRect[i].boundingRect();
+            //Uncomment if you want to see Rectangles on image
+            // Point2f rect_points[4];
+            // minRect[i].points( rect_points );
+            // for ( int j = 0; j < 4; j++ )
+            // {
+            //     line( Threshold, rect_points[j], rect_points[(j+1)%4], (0,0,255) );
+            // }
+        }
+    }
+    // imshow("Result", Threshold);
+    // waitKey();
+    return Rectangle;
+}
+
+void SteppedDetection(const Mat &Frame, Point2i *MassCenter1, Point2i *MassCenter2, Point2i *MassCenterAverage, const Color &ColorHsv1, const Color &ColorHsv2)
+{
+    Mat FrameHSV, Threshold;
+
+    // converting the Frame to FrameHsv color model
+    cvtColor(Frame, FrameHSV, COLOR_BGR2HSV);
+
+    Threshold = TakeThresholdOfBlob(FrameHSV, ColorHsv1);
+    Rect RectangleOfColor = detectBlob(Threshold);
+    *MassCenter1 = GetMassCenter(RectangleOfColor);
+    // just for tests
+    //  cout << RectangleOfMagenta << endl;
+
+    Threshold = TakeThresholdOfBlob(FrameHSV, ColorHsv2);
+    RectangleOfColor = detectBlob(Threshold);
+    *MassCenter2 = GetMassCenter(RectangleOfColor);
+    // just for tests
+    //  cout << RectangleOfBlue << endl;
+    *MassCenterAverage = GetMassCenter(MassCenter1, MassCenter2);
+}
 
 class MovementCalculation
 {
     public:
-        float AngleInRadian;
-        int DistanceInPixel;
-        void findAngle(MassCenter blob1, MassCenter blob2, Point2i Destination);
-        void findDistanceToDestination(MassCenter AverageCenter, Point2i Destination);
-        float GetAngle(){ return AngleInRadian; };
-        int GetDistance(){ return DistanceInPixel; };
-
+        float findAngle(Point2i MassCenter1, Point2i MassCenter2, Point2i Destination);
+        int findDistanceToDestination(Point2i AverageCenter, Point2i Destination);
 };
 
 enum class TypesOfRequest 
@@ -60,12 +106,23 @@ enum class TypesOfRequest
     None = 0, 
     Deliver
     };
+
+enum States{
+        Running = 1,
+        DoDeliver,
+        Move,
+        Rotate,
+        Waiting,
+        Disabling
+    };
+
 class Request
 {
-    public:
+    private:
         Point2i Destination {960,1280};
         TypesOfRequest Type;
         Color ColorPuf{0,0,0};
+    public:
         Request()
         {
             this->Type = TypesOfRequest::None;
@@ -81,62 +138,167 @@ class Request
             this->Type = req.Type;
             return *this;
         }
+        void SetColor(Color Color){ this -> ColorPuf = Color; }
+        void SetDestination(Point2i Point){ this -> Destination = Point; }
+        void SetType(TypesOfRequest Type){ this -> Type = Type; }
+        Color GetColor(){ return ColorPuf; }
+        Point2i GetDestination(){ return Destination; }
         TypesOfRequest GetType(){ return Type; }
 };
 
 class Controller
 {
+    private:
+    Color BlueHsv{100, 0, 0};
+    Color MagentaHsv{166, 0, 0};
+
     public:
         void MakeRequest(Request &Req, Color ColorPuf, TypesOfRequest Type)
         {
-            Req.ColorPuf = ColorPuf;
-            Req.Type = Type;
+            Req.SetColor(ColorPuf);
+            Req.SetType(Type);
         }
         void FinishRequest(Request &Req)
         {
-            Req.Type = TypesOfRequest::None;
+            Req.SetType(TypesOfRequest::None);
         }
-        void Move(int Distance)
+        void Move(int &Distance)
         {
             cout << "Moving " << Distance << endl;
+            Distance = 0;
             cout << "Movement Completed!" << endl;
         }
-        void Rotate(float Angle)
+        void Rotate(float &Angle)
         {
             cout << "Rotating to " << Angle*180/M_PIf << endl;
+            Angle = 0;
             cout << "Rotation Completed!" << endl;
         }
         void GoHome()
         {
             cout << "Going Home.." << endl;
         }
+        void FiniteAutomate(States &State, Request &Request)
+        {
+            float Angle = 0;
+            int Distance = 0;
+            while (true)
+            {
+                Controller *Controller = this;
+                switch (State)
+                {
+                    case States::Running:
+                    {
+                        // Making a request
+                        char c;
+                        cin >> c;
+                        if (c == 'd')
+                        {
+                            cout << "Enter color of ottoman" << endl;
+                            int Hue = 0, Saturation = 0, Value = 0;
+                            cout << "Hue: ";
+                            cin >> Hue;
+                            cout << "Saturation: ";
+                            cin >> Saturation;
+                            cout << "Value: ";
+                            cin >> Value;
+
+                            Color ColorPuf(Hue, Saturation, Value);
+
+                            Controller->MakeRequest(Request, ColorPuf, TypesOfRequest::Deliver);
+                        }
+
+                        if (Request.GetType() == TypesOfRequest::System)
+                            State = Disabling;
+                        else if (Request.GetType() == TypesOfRequest::Deliver)
+                            State = DoDeliver;
+                        else
+                            Controller->GoHome();
+                        break;
+                    }
+                    case States::DoDeliver:
+                    {
+                        // VideoCapture Cap("0");
+                        // Capture frame-by-frame
+                        // Cap >> Frame;
+
+                        // If the frame is empty, break immediately
+                        // if (Frame.empty())
+                        //   State = Running;
+
+                        // Imitation of capturing camera
+                        Mat Frame = imread("img_0.jpg");
+
+                        Point2i MassCenterBlue, MassCenterMagenta, MassCenterAverage;
+
+                        SteppedDetection(Frame, &MassCenterBlue, &MassCenterMagenta, &MassCenterAverage, BlueHsv, MagentaHsv);
+
+                        MovementCalculation MoveBot;
+                        Angle = MoveBot.findAngle(MassCenterBlue, MassCenterMagenta, Request.GetDestination());
+                        Distance = MoveBot.findDistanceToDestination(MassCenterAverage, Request.GetDestination());
+                        cout << "Angle : " << Angle << " Distance: " << Distance << endl;
+
+                        // Deviation for if`s
+                        float ErrorAngle = 0.1;
+                        int ErrorDist = 100;
+                        if (Angle > ErrorAngle || Angle < (-ErrorAngle))
+                        {
+                            State = States::Rotate;
+                            break;
+                        }
+                        else if (Distance > ErrorDist)
+                        {
+                            State = States::Move;
+                            break;
+                        }
+                        else
+                        {
+                            State = Waiting;
+                            break;
+                        }
+
+                        break;
+                    }
+
+                    case States::Move:
+                        State = DoDeliver;
+                        Controller->Move(Distance);
+                        break;
+
+                    case States::Rotate:
+                        State = DoDeliver;
+                        Controller->Rotate(Angle);
+                        break;
+
+                    case States::Waiting:
+                        // while(CupOnTheBot())
+                        // {
+                        //     if(CloseToClient())
+                        //         cout << "Take your drink!" << endl;
+                        //     if(CloseToDispenser())
+                        //         cout << "The drink is being poured!" << endl;
+                        // }
+                        State = Running;
+                        Controller->FinishRequest(Request);
+                        break;
+                }
+            }
+        }
 };
 
-MassCenter::MassCenter(Rect Rectangle)
+float MovementCalculation::findAngle(Point2i MassCenter1, Point2i MassCenter2, Point2i Dest)
 {
-    Point2i TopLeftPointRect = Rectangle.tl();
-    Point2i BottomRightPointRect = Rectangle.br();
-    this->X = (TopLeftPointRect.x + BottomRightPointRect.x)/2;
-    this->Y = (TopLeftPointRect.y + BottomRightPointRect.y)/2;
+    int CenterX = int(MassCenter1.x + MassCenter2.x)/2;
+    int CenterY = int(MassCenter1.y + MassCenter2.y)/2;
+    float AngleInRadian = static_cast<float>(acos(((MassCenter1.x - CenterX) * (CenterX - Dest.x) + (MassCenter1.y - CenterY) * (CenterY - Dest.y))/
+                            (sqrt(pow((MassCenter1.x - CenterX), 2) + pow((MassCenter1.y - CenterY), 2)) * sqrt(pow((CenterX - Dest.x), 2) + pow((CenterY - Dest.y), 2)))));
+    return AngleInRadian;
 }
 
-MassCenter::MassCenter(MassCenter Center1, MassCenter Center2)
+int MovementCalculation::findDistanceToDestination(Point2i AverageCenter, Point2i Dest)
 {
-    this->X = (Center1.X + Center2.X)/2;
-    this->Y = (Center1.Y + Center2.Y)/2;
-}
-
-void MovementCalculation::findAngle(MassCenter blob1, MassCenter blob2, Point2i Dest)
-{
-    int CenterX = int(blob1.X + blob2.X)/2;
-    int CenterY = int(blob1.Y + blob2.Y)/2;
-    this -> AngleInRadian = static_cast<float>(acos(((blob1.X - CenterX) * (CenterX - Dest.x) + (blob1.Y - CenterY) * (CenterY - Dest.y))/
-                            (sqrt(pow((blob1.X - CenterX), 2) + pow((blob1.Y - CenterY), 2)) * sqrt(pow((CenterX - Dest.x), 2) + pow((CenterY - Dest.y), 2)))));
-}
-
-void MovementCalculation::findDistanceToDestination(MassCenter AverageCenter, Point2i Dest)
-{
-    this -> DistanceInPixel = sqrt(pow((AverageCenter.X - Dest.x),2) + pow((AverageCenter.Y - Dest.y),2));
+    int DistanceInPixel = sqrt(pow((AverageCenter.x - Dest.x),2) + pow((AverageCenter.y - Dest.y),2));
+    return DistanceInPixel;
 }
 
 void SetColor(Mat Frame)
@@ -172,181 +334,19 @@ void SetColor(Mat Frame)
     destroyAllWindows;
 }
 
-Mat TakeThresholdOfBlob(Mat FrameHSV, Color Color)
-{
-    Mat Threshold;
-    //vectors of HSV color that need to find. Make a range using Offset
-    uint8_t Offset = 5;
-    vector <uint8_t> HsvMin = {static_cast<uint8_t>(Color.Hue - Offset),100,100};
-    vector <uint8_t> HsvMax = {static_cast<uint8_t>(Color.Hue + Offset),255,255};
-    
-    //Make result image matrix with found color
-    inRange(FrameHSV, HsvMin, HsvMax, Threshold);
-    //Creating the image in white&black with area of needed color 
-    // imwrite( "FrameResult.jpg", Threshold );
-    return Threshold;
-}
 
-Rect detectBlob(Mat Threshold)
-{
-    Rect Rectangle;
-    vector<vector<Point>> Contours;
-    vector<Vec4i> Hierarchy;
-
-    findContours(Threshold, Contours, RETR_TREE, CHAIN_APPROX_SIMPLE);
-    
-    vector<RotatedRect> minRect(Contours.size());
-    for(size_t i = 0; i < Contours.size(); i++)
-            minRect[i] = minAreaRect(Contours[i]);
-    
-    for(size_t i = 0; i < Contours.size(); i++)
-    {
-        int area = minRect[i].size.height*minRect[i].size.width;
-        if(area > 10'000)
-        {
-            Rectangle = minRect[i].boundingRect();
-            //Uncomment if you want to see Rectangles on image
-            // Point2f rect_points[4];
-            // minRect[i].points( rect_points );
-            // for ( int j = 0; j < 4; j++ )
-            // {
-            //     line( Threshold, rect_points[j], rect_points[(j+1)%4], (0,0,255) );
-            // }
-        }
-    }
-    // imshow("Result", Threshold);
-    // waitKey();
-    return Rectangle;
-}
 
 int main()
 {
-    enum States{
-        Running = 1,
-        DoDeliver,
-        Move,
-        Rotate,
-        Waiting,
-        Disabling
-    }State {Running};
-
     Request Request;
     Controller Controller;
-    Mat Frame, FrameHSV, Threshold;
     Rect RectangleOfMagenta, RectangleOfBlue;
-    MovementCalculation MoveBot;
 
-    MoveBot.AngleInRadian = -0.685;
-    MoveBot.DistanceInPixel = 555;
-    // VideoCapture cap("Cap");
-    //Deviation for if`s
-    float ErrorAngle = 0.1;
-    int ErrorDist = 100;
+    //Turning on the Bot
+    States State = Running;
     
-    while(true)
-    {
-        switch(State)
-        {
-            case Running:
-            {
-                //Making a request
-                char c;
-                cin >> c;
-                if(c=='d')
-                {
-                    int Hue = 0, Saturation = 0, Value = 0;
-                    cout << "Hue: ";
-                    cin >> Hue;
-                    cout << "Saturation: ";
-                    cin >> Saturation;
-                    cout << "Value: ";
-                    cin >> Value;
 
-                    Color ColorPuf(Hue, Saturation, Value);
-                    
-                    Controller.MakeRequest(Request, ColorPuf, TypesOfRequest::Deliver);
-                }
-
-                if(Request.GetType() == TypesOfRequest::System)
-                    State = Disabling;
-                else if(Request.GetType() == TypesOfRequest::Deliver)
-                    State = DoDeliver;
-                else
-                    Controller.GoHome();
-                break;
-            }
-            case DoDeliver:
-            {
-            // Capture frame-by-frame
-                // cap >> frame;
-            
-            // If the frame is empty, break immediately
-                // if (Frame.empty())
-                //   State = Running;
-
-            //Imitation of capturing camera
-
-                Frame = imread("img_0.jpg");
-                
-            //converting the Frame to FrameHsv color model
-                cvtColor(Frame, FrameHSV, COLOR_BGR2HSV);
-                
-
-                Threshold = TakeThresholdOfBlob(FrameHSV, MagentaHSV);
-                RectangleOfMagenta = detectBlob(Threshold);
-            //just for tests
-                // cout << RectangleOfMagenta << endl;
-
-                Threshold = TakeThresholdOfBlob(FrameHSV,BlueHSV);
-                Rect RectangleOfBlue = detectBlob(Threshold);
-            //just for tests
-                // cout << RectangleOfBlue << endl;
-
-                MassCenter MCBlue(RectangleOfBlue);
-                MassCenter MCMagenta(RectangleOfMagenta);
-                MassCenter MCAverage(MCBlue, MCMagenta);    
-                
-                // MoveBot.findAngle(MCBlue, MCMagenta, Request.Destination);
-                // MoveBot.findDistanceToDestination(MCAverage, Request.Destination);
-                if(MoveBot.GetAngle() > ErrorAngle || MoveBot.GetAngle() < (-ErrorAngle))
-                    {
-                        State = Rotate;
-                        cout << "ifRotate";
-                        break;
-                    }
-
-                if(MoveBot.GetDistance() > ErrorDist)
-                    {
-                        State = Move;
-                        break;
-                    }
-                    else
-                    {
-                        State = Waiting;
-                        break;
-                    }
-
-                break;
-            }
-
-            case Move:
-                State = DoDeliver;
-                Controller.Move(MoveBot.GetDistance());
-                MoveBot.DistanceInPixel = 0;
-                break;
-
-            case Rotate:
-                State = DoDeliver;
-                Controller.Rotate(MoveBot.GetAngle());
-                MoveBot.AngleInRadian = 0;
-                break;
-
-            case Waiting:
-                State = Running;
-                Controller.FinishRequest(Request);
-                break;
-        }
-    }
+    Controller.FiniteAutomate(State, Request);
 
     return 0;
 }
