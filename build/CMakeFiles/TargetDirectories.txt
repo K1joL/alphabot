@@ -1,3 +1,0 @@
-/home/k1jol/alphabot/build/CMakeFiles/main.dir
-/home/k1jol/alphabot/build/CMakeFiles/edit_cache.dir
-/home/k1jol/alphabot/build/CMakeFiles/rebuild_cache.dir
