@@ -1,7 +1,7 @@
 FROM ubuntu:22.04
 RUN apt update \
 && apt install -y git \
-&& apt install -y g++ cmake make git libgtk2.0-dev pkg-config libopencv-viz-dev\
+&& apt install -y g++ cmake make git libgtk2.0-dev pkg-config \
 && git clone https://github.com/opencv/opencv.git \
 && git clone https://github.com/opencv/opencv_contrib.git \
 && mkdir -p build \
