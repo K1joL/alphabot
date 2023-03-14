@@ -7,7 +7,8 @@ RUN apt update \
 && mkdir -p build \
 && cd build \
 && cmake -DOPENCV_EXTRA_MODULES_PATH=opencv_contrib/modules /opencv \
-&& make \
+&& make -j5 \
+&& make install \
 && cd / \
 && git clone https://github.com/K1joL/alphabot \
 && cd alphabot \
