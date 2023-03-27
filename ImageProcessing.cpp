@@ -42,7 +42,7 @@ cv::Mat Detector::TakeThresholdOfBlob(const cv::Mat &frameHSV, Color color)
     //Make result image matrix with found color
     inRange(frameHSV, HsvMin, HsvMax, threshold);
     //Creating the image in white&black with area of needed color 
-    // imwrite( "FrameResult.jpg", threshold );
+    // imshow( "FrameResult.jpg", threshold );
     return threshold;
 }
 

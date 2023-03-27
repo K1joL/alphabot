@@ -41,8 +41,9 @@ int main()
 {
     Request request;
     Controller controller;
+    cv::VideoCapture Cap("/dev/video0");
 
-    controller.FiniteAutomate(request);
+    controller.FiniteAutomate(request, Cap);
 
     return 0;
 }

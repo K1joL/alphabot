@@ -47,6 +47,29 @@ Request::Request()
 {
     this->Type = TypesOfRequest::None;
 }
+void MosquittoPub::SendToServer(const char *data)
+{
+    bool clean_session = true;
+    struct mosquitto *mosq = NULL;
+    mosq = mosquitto_new(NULL, clean_session, NULL);
+    mosquitto_connect(mosq, MQTT_SERVER, MQTT_PORT, KEEP_ALIVE);
+    mosquitto_publish(mosq, NULL, MQTT_PUB_TOPIC, strlen(data), data, 0, 0);
+    mosquitto_destroy(mosq);
+}
+
+void *MosquittoPub::Publish(const char *message)
+{
+    static int uniquemessageid = 0;
+    json_object *json_obj;
+    json_obj = json_tokener_parse("{}");
+    const char *json_str;
+
+    json_object_object_add(json_obj, "Message", json_object_new_string(message));
+    json_str = json_object_get_string(json_obj);
+    SendToServer(json_str);
+
+    return NULL;
+}
 
 void Controller::MakeRequest(Request &req, Color ColorPuf, TypesOfRequest Type)
 {
@@ -59,18 +82,16 @@ void Controller::FinishRequest(Request &req)
     req.SetType(TypesOfRequest::None);
 }
 
-void Controller::Move(int &distance)
+void Controller::Move(float distance, MosquittoPub &MosPub)
 {
     std::cout << "Moving " << distance << std::endl;
-    distance = 0;
-    std::cout << "Movement Completed!" << std::endl;
+    MosPub.Publish("Moving");
 }
 
-void Controller::Rotate(float &angle)
+void Controller::Rotate(float angle, MosquittoPub &MosPub)
 {
-    std::cout << "Rotating to " << angle * 180 / M_PIf << std::endl;
-    angle = 0;
-    std::cout << "Rotation Completed!" << std::endl;
+    std::cout << "Rotating to " << angle * 180/ M_PIf << std::endl;
+    MosPub.Publish("Rotating");
 }
 
 void Controller::GoHome()
@@ -78,8 +99,9 @@ void Controller::GoHome()
     std::cout << "Going Home.." << std::endl;
 }
 
-void Controller::FiniteAutomate(Request &request)
+void Controller::FiniteAutomate(Request &request, cv::VideoCapture &Cap)
 {
+    MosquittoPub MosPub;
     float angle = 0;
     int distance = 0;
     Detector detector;
@@ -119,16 +141,16 @@ void Controller::FiniteAutomate(Request &request)
         }
         case States::DoDeliver:
         {
-            // VideoCapture Cap("0");
+            cv::Mat frame;
             // Capture frame-by-frame
-            // Cap >> frame;
+            Cap >> frame;
 
             // If the frame is empty, break immediately
-            // if (frame.empty())
-            //   State = Running;
+            if (frame.empty())
+                state = States::Running;
 
             // Imitation of capturing camera
-            cv::Mat frame = cv::imread("img_0.jpg");
+            // cv::Mat frame = cv::imread("img_0.jpg");
 
             cv::Point2i massCenterBlue, massCenterMagenta, massCenterAverage;
 
@@ -163,12 +185,12 @@ void Controller::FiniteAutomate(Request &request)
 
         case States::Move:
             state = DoDeliver;
-            controller->Move(distance);
+            controller->Move(distance, MosPub);
             break;
 
         case States::Rotate:
             state = DoDeliver;
-            controller->Rotate(angle);
+            controller->Rotate(angle, MosPub);
             break;
 
         case States::Waiting:
@@ -185,4 +207,3 @@ void Controller::FiniteAutomate(Request &request)
         }
     }
 }
-

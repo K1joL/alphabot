@@ -4,6 +4,11 @@
 #include "opencv2/opencv.hpp"
 #include <iostream>
 #include "ImageProcessing.h"
+#include <cstring>
+#include <stdio.h>
+#include <mosquitto.h>
+#include <json-c/json.h>
+#include <unistd.h>
 
 enum class TypesOfRequest{
     System = -1, 
@@ -19,6 +24,20 @@ enum States{
         Waiting,
         Disabling
     };
+class MosquittoPub
+{
+    private:
+        char *MQTT_SERVER = "localhost";
+        int KEEP_ALIVE = 60;
+        int MQTT_PORT = 1883;
+        char *MQTT_PUB_TOPIC = "/funmqqt";
+        int MQTT_QOS_LEVEL = 2;
+        int MSG_MAX_SIZE = 512;
+
+    public:
+        void SendToServer (const char* data);
+        void *Publish (const char* message);
+};
 
 class Request
 {
@@ -48,10 +67,10 @@ class Controller
     public:
         void MakeRequest(Request &req, Color ColorPuf, TypesOfRequest Type);
         void FinishRequest(Request &req);
-        void Move(int &distance);
-        void Rotate(float &angle);
+        void Move(float distance, MosquittoPub &MosPub);
+        void Rotate(float angle, MosquittoPub &MosPub);
         void GoHome();
-        void FiniteAutomate(Request &request);
+        void FiniteAutomate(Request &request, cv::VideoCapture &Cap);
 };
 
 
