@@ -67,7 +67,7 @@ class Controller
     public:
         void MakeRequest(Request &req, Color ColorPuf, TypesOfRequest Type);
         void FinishRequest(Request &req);
-        void Move(float distance, MosquittoPub &MosPub);
+        void Move(int distance, MosquittoPub &MosPub);
         void Rotate(float angle, MosquittoPub &MosPub);
         void GoHome();
         void FiniteAutomate(Request &request, cv::VideoCapture &Cap);

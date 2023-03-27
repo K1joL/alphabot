@@ -82,7 +82,7 @@ void Controller::FinishRequest(Request &req)
     req.SetType(TypesOfRequest::None);
 }
 
-void Controller::Move(float distance, MosquittoPub &MosPub)
+void Controller::Move(int distance, MosquittoPub &MosPub)
 {
     std::cout << "Moving " << distance << std::endl;
     MosPub.Publish("Moving");
