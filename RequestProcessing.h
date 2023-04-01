@@ -3,12 +3,9 @@
 
 #include "opencv2/opencv.hpp"
 #include <iostream>
+
+#include "Mqtt.h"
 #include "ImageProcessing.h"
-#include <cstring>
-#include <stdio.h>
-#include <mosquitto.h>
-#include <json-c/json.h>
-#include <unistd.h>
 
 enum class TypesOfRequest{
     System = -1, 
@@ -24,55 +21,45 @@ enum States{
         Waiting,
         Disabling
     };
-class MosquittoPub
-{
-    private:
-        char *MQTT_SERVER = "localhost";
-        int KEEP_ALIVE = 60;
-        int MQTT_PORT = 1883;
-        char *MQTT_PUB_TOPIC = "/funmqqt";
-        int MQTT_QOS_LEVEL = 2;
-        int MSG_MAX_SIZE = 512;
-
-    public:
-        void SendToServer (const char* data);
-        void *Publish (const char* message);
-};
 
 class Request
 {
     private:
-        cv::Point2i Destination {960,1280};
-        TypesOfRequest Type;
-        Color ColorPuf{0,0,0};
+        cv::Point2i destination_ {960,1280};
+        TypesOfRequest type_;
+        Color colorPuf_{0,0,0};
     public:
-        Request();
-        Request(Color colorPuf, TypesOfRequest type = TypesOfRequest::None);
+        Request() : type_ {TypesOfRequest::None} 
+        {            
+        }
+        Request(Color colorPuf, TypesOfRequest type = TypesOfRequest::None) 
+            : colorPuf_{colorPuf}, type_{type}
+        {
+        }
+
         Request &operator= (Request &req);
-        void SetColor(Color Color);
-        void SetDestination(cv::Point2i Point);
-        void SetType(TypesOfRequest Type);
-        Color GetColor();
-        cv::Point2i GetDestination();
-        TypesOfRequest GetType();
+        void SetColor(Color color)             { this->colorPuf_ = color; }
+        void SetDestination(cv::Point2i point) { this->destination_ = point; }
+        void SetType(TypesOfRequest type)      { this->type_ = type; }
+        Color GetColor()                       { return colorPuf_; }
+        cv::Point2i GetDestination()           { return destination_; }
+        TypesOfRequest GetType()               { return type_; }
 };
 
 class Controller
 {
     private:
-    Color BlueHsv{100, 0, 0};
-    Color MagentaHsv{166, 0, 0};
-    States state = Running;
+        Color tailColorHsv{100, 0, 0};
+        Color headColorHsv{166, 0, 0};
+        States state = Running;
 
     public:
-        void MakeRequest(Request &req, Color ColorPuf, TypesOfRequest Type);
+        void MakeRequest(Request &req, Color colorPuf, TypesOfRequest type);
         void FinishRequest(Request &req);
-        void Move(int distance, MosquittoPub &MosPub);
-        void Rotate(float angle, MosquittoPub &MosPub);
+        void Move(int distance, MosquittoPub &mosPub);
+        void Rotate(float angle, MosquittoPub &mosPub);
         void GoHome();
-        void FiniteAutomate(Request &request, cv::VideoCapture &Cap);
+        void FiniteAutomate(cv::VideoCapture &cap);
 };
-
-
 
 #endif

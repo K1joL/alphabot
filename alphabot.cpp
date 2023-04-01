@@ -1,6 +1,7 @@
 #include "RequestProcessing.h"
 #include "ImageProcessing.h"
 
+
 using namespace std;
 using namespace cv;
 
@@ -39,11 +40,10 @@ void SetColor(Mat frame)
 
 int main()
 {
-    Request request;
     Controller controller;
     cv::VideoCapture Cap("/dev/video0");
 
-    controller.FiniteAutomate(request, Cap);
+    controller.FiniteAutomate(Cap);
 
     return 0;
 }

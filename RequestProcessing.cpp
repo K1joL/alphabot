@@ -1,80 +1,16 @@
 #include "RequestProcessing.h"
 
-void Request::SetColor(Color color)
-{
-    this->ColorPuf = color;
-}
-
-void Request::SetDestination(cv::Point2i point)
-{
-    this->Destination = point;
-}
-
-void Request::SetType(TypesOfRequest type)
-{
-    this->Type = type;
-}
-
-Color Request::GetColor()
-{
-    return ColorPuf;
-}
-
-cv::Point2i Request::GetDestination()
-{
-    return Destination;
-}
-
-TypesOfRequest Request::GetType()
-{
-    return Type;
-}
-
 Request &Request::operator=(Request &req)
 {
-    this->ColorPuf = req.ColorPuf;
-    this->Type = req.Type;
+    this->colorPuf_ = req.colorPuf_;
+    this->type_ = req.type_;
     return *this;
 }
 
-Request::Request(Color colorPuf, TypesOfRequest type)
+void Controller::MakeRequest(Request &req, Color colorPuf, TypesOfRequest type)
 {
-    this->Type = type;
-    this->ColorPuf = colorPuf;
-}
-
-Request::Request()
-{
-    this->Type = TypesOfRequest::None;
-}
-void MosquittoPub::SendToServer(const char *data)
-{
-    bool clean_session = true;
-    struct mosquitto *mosq = NULL;
-    mosq = mosquitto_new(NULL, clean_session, NULL);
-    mosquitto_connect(mosq, MQTT_SERVER, MQTT_PORT, KEEP_ALIVE);
-    mosquitto_publish(mosq, NULL, MQTT_PUB_TOPIC, strlen(data), data, 0, 0);
-    mosquitto_destroy(mosq);
-}
-
-void *MosquittoPub::Publish(const char *message)
-{
-    static int uniquemessageid = 0;
-    json_object *json_obj;
-    json_obj = json_tokener_parse("{}");
-    const char *json_str;
-
-    json_object_object_add(json_obj, "Message", json_object_new_string(message));
-    json_str = json_object_get_string(json_obj);
-    SendToServer(json_str);
-
-    return NULL;
-}
-
-void Controller::MakeRequest(Request &req, Color ColorPuf, TypesOfRequest Type)
-{
-    req.SetColor(ColorPuf);
-    req.SetType(Type);
+    req.SetColor(colorPuf);
+    req.SetType(type);
 }
 
 void Controller::FinishRequest(Request &req)
@@ -82,16 +18,16 @@ void Controller::FinishRequest(Request &req)
     req.SetType(TypesOfRequest::None);
 }
 
-void Controller::Move(int distance, MosquittoPub &MosPub)
+void Controller::Move(int distance, MosquittoPub &mosPub)
 {
     std::cout << "Moving " << distance << std::endl;
-    MosPub.Publish("Moving");
+    mosPub.Publish("Moving");
 }
 
-void Controller::Rotate(float angle, MosquittoPub &MosPub)
+void Controller::Rotate(float angle, MosquittoPub &mosPub)
 {
     std::cout << "Rotating to " << angle * 180/ M_PIf << std::endl;
-    MosPub.Publish("Rotating");
+    mosPub.Publish("Rotating");
 }
 
 void Controller::GoHome()
@@ -99,9 +35,10 @@ void Controller::GoHome()
     std::cout << "Going Home.." << std::endl;
 }
 
-void Controller::FiniteAutomate(Request &request, cv::VideoCapture &Cap)
+void Controller::FiniteAutomate(cv::VideoCapture &cap)
 {
-    MosquittoPub MosPub;
+    Request request;
+    MosquittoPub mosPub;
     float angle = 0;
     int distance = 0;
     Detector detector;
@@ -118,17 +55,18 @@ void Controller::FiniteAutomate(Request &request, cv::VideoCapture &Cap)
             if (c == 'd')
             {
                 std::cout << "Enter color of ottoman" << std::endl;
-                int Hue = 0, Saturation = 0, Value = 0;
+                int hue = 0, saturation = 0, value = 0;
                 std::cout << "Hue: ";
-                std::cin >> Hue;
+                std::cin >> hue;
                 std::cout << "Saturation: ";
-                std::cin >> Saturation;
+                std::cin >> saturation;
                 std::cout << "Value: ";
-                std::cin >> Value;
+                std::cin >> value;
 
-                Color colorPuf(Hue, Saturation, Value);
+                Color colorPuf(hue, saturation, value);
 
                 controller->MakeRequest(request, colorPuf, TypesOfRequest::Deliver);
+                
             }
 
             if (request.GetType() == TypesOfRequest::System)
@@ -143,7 +81,7 @@ void Controller::FiniteAutomate(Request &request, cv::VideoCapture &Cap)
         {
             cv::Mat frame;
             // Capture frame-by-frame
-            Cap >> frame;
+            cap >> frame;
 
             // If the frame is empty, break immediately
             if (frame.empty())
@@ -152,12 +90,17 @@ void Controller::FiniteAutomate(Request &request, cv::VideoCapture &Cap)
             // Imitation of capturing camera
             // cv::Mat frame = cv::imread("img_0.jpg");
 
-            cv::Point2i massCenterBlue, massCenterMagenta, massCenterAverage;
+            cv::Point2i massCenterHead = detector.SteppedDetection(frame, headColorHsv), 
+            massCenterTail = detector.SteppedDetection(frame, tailColorHsv), 
+            massCenterAverage = detector.GetMassCenter(&massCenterHead, &massCenterTail);
+            // detector.SteppedDetection(frame, &massCenterTail, &massCenterHead, &massCenterAverage, tailColorHsv, headColorHsv);
 
-            detector.SteppedDetection(frame, &massCenterBlue, &massCenterMagenta, &massCenterAverage, BlueHsv, MagentaHsv);
+
+            //Setting destination
+            request.SetDestination(detector.SteppedDetection(frame, request.GetColor()));
 
             MovementCalculation moveBot;
-            angle = moveBot.findAngle(massCenterBlue, massCenterMagenta, request.GetDestination());
+            angle = moveBot.findAngle(massCenterTail, massCenterHead, request.GetDestination());
             distance = moveBot.findDistanceToDestination(massCenterAverage, request.GetDestination());
             std::cout << "Angle : " << angle << " Distance: " << distance << std::endl;
 
@@ -185,12 +128,12 @@ void Controller::FiniteAutomate(Request &request, cv::VideoCapture &Cap)
 
         case States::Move:
             state = DoDeliver;
-            controller->Move(distance, MosPub);
+            controller->Move(distance, mosPub);
             break;
 
         case States::Rotate:
             state = DoDeliver;
-            controller->Rotate(angle, MosPub);
+            controller->Rotate(angle, mosPub);
             break;
 
         case States::Waiting:

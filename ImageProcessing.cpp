@@ -79,42 +79,37 @@ cv::Rect Detector::detectBlob(const cv::Mat &threshold)
     return rectangle;
 }
 
-void Detector::SteppedDetection(const cv::Mat &frame, cv::Point2i *massCenter1, cv::Point2i *massCenter2, cv::Point2i *massCenterAverage, const Color &colorHsv1, const Color &colorHsv2)
+cv::Point2i Detector::SteppedDetection(const cv::Mat &frame, Color colorHSV)
 {
     cv::Mat frameHSV, threshold;
+    cv::Rect rectangleOfColor;
 
-    // converting the Frame to FrameHsv color model
     cvtColor(frame, frameHSV, cv::COLOR_BGR2HSV);
-
-    threshold = TakeThresholdOfBlob(frameHSV, colorHsv1);
-    cv::Rect rectangleOfColor = detectBlob(threshold);
-    *massCenter1 = GetMassCenter(rectangleOfColor);
-    // just for tests
-    //  cout << RectangleOfMagenta << endl;
-
-    threshold = TakeThresholdOfBlob(frameHSV, colorHsv2);
+    threshold = TakeThresholdOfBlob(frameHSV, colorHSV);
     rectangleOfColor = detectBlob(threshold);
-    *massCenter2 = GetMassCenter(rectangleOfColor);
-    // just for tests
-    //  cout << RectangleOfBlue << endl;
-    *massCenterAverage = GetMassCenter(massCenter1, massCenter2);
+    
+    return GetMassCenter(rectangleOfColor);
 }
 
-Color::Color()
-{
-    colorHsv[0] = 0;
-    colorHsv[1] = 0;
-    colorHsv[2] = 0;
-}
+//NEED REFACTORING
+// void Detector::SteppedDetection(const cv::Mat &frame, cv::Point2i *massCenter1, cv::Point2i *massCenter2, cv::Point2i *massCenterAverage, const Color &colorHsv1, const Color &colorHsv2)
+// {
+//     cv::Mat frameHSV, threshold;
 
-Color::Color(double hue, double saturation, double value)
-{
-    colorHsv[0] = hue;
-    colorHsv[1] = saturation;
-    colorHsv[2] = value;
-}
+//     // converting the Frame to FrameHsv color model
+//     cvtColor(frame, frameHSV, cv::COLOR_BGR2HSV);
 
-double& Color::operator[](int index)
-{
-    return colorHsv[index];
-}
+//     threshold = TakeThresholdOfBlob(frameHSV, colorHsv1);
+//     cv::Rect rectangleOfColor = detectBlob(threshold);
+//     *massCenter1 = GetMassCenter(rectangleOfColor);
+//     // just for tests
+//     //  cout << RectangleOfMagenta << endl;
+
+//     threshold = TakeThresholdOfBlob(frameHSV, colorHsv2);
+//     rectangleOfColor = detectBlob(threshold);
+//     *massCenter2 = GetMassCenter(rectangleOfColor);
+//     // just for tests
+//     //  cout << RectangleOfBlue << endl;
+//     *massCenterAverage = GetMassCenter(massCenter1, massCenter2);
+// }
+
