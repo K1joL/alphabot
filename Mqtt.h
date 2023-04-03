@@ -2,11 +2,14 @@
 #define SUBSCRIBER_H
 
 #include <cstring>
+#include <string>
 #include <stdio.h>
 #include <mosquitto.h>
 #include <json-c/json.h>
 #include <unistd.h>
-#include "RequestProcessing.h"
+#include <vector>
+
+class Request;
 
 class MosquittoSub
 {
@@ -34,7 +37,6 @@ public:
 
 namespace MqttSub
 {
-    Request request;
     void on_connect_cb(struct mosquitto *mosq, void *userdata, int result);
     void on_subscribe_cb(struct mosquitto *mosq, void *userdata, int mid, int qos_count, const int *granted_qos);
     void on_message_cb(struct mosquitto *mosq, void *userdata, const struct mosquitto_message *msg);

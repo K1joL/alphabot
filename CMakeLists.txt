@@ -8,5 +8,5 @@ find_package(json-c CONFIG)
 
 find_package( OpenCV REQUIRED)
 include_directories( ${OpenCV_INCLUDE_DIRS} )
-add_executable( main alphabot.cpp RequestProcessing.cpp ImageProcessing.cpp Mqtt.cpp )
+add_executable( main alphabot.cpp Mqtt.cpp RequestProcessing.cpp ImageProcessing.cpp )
 target_link_libraries( main PkgConfig::Mosquitto json-c::json-c ${OpenCV_LIBS} )

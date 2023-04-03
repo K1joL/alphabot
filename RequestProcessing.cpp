@@ -1,4 +1,14 @@
 #include "RequestProcessing.h"
+#include <pthread.h>
+
+extern Request requestGlobal;
+
+void Request::SetColor(double hue, double saturation, double value)
+{
+    colorPuf_[0] = hue;
+    colorPuf_[1] = saturation;
+    colorPuf_[2] = value;
+}
 
 Request &Request::operator=(Request &req)
 {
@@ -37,8 +47,9 @@ void Controller::GoHome()
 
 void Controller::FiniteAutomate(cv::VideoCapture &cap)
 {
-    Request request;
     MosquittoPub mosPub;
+    MosquittoSub *ptrServerSub = new MosquittoSub("localhost", "/telega");
+    pthread_t thread_id[2];
     float angle = 0;
     int distance = 0;
     Detector detector;
@@ -54,24 +65,37 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
             std::cin >> c;
             if (c == 'd')
             {
-                std::cout << "Enter color of ottoman" << std::endl;
-                int hue = 0, saturation = 0, value = 0;
-                std::cout << "Hue: ";
-                std::cin >> hue;
-                std::cout << "Saturation: ";
-                std::cin >> saturation;
-                std::cout << "Value: ";
-                std::cin >> value;
+                // std::cout << "Enter color of ottoman" << std::endl;
+                // int hue = 0, saturation = 0, value = 0;
+                // std::cout << "Hue: ";
+                // std::cin >> hue;
+                // std::cout << "Saturation: ";
+                // std::cin >> saturation;
+                // std::cout << "Value: ";
+                // std::cin >> value;
 
-                Color colorPuf(hue, saturation, value);
+                // Color colorPuf(hue, saturation, value);
+                if (pthread_create(&thread_id[0], NULL, &MosquittoSub::WrapperSubscribe, ptrServerSub))
+                {
+                    printf("FAILED......");
+                    exit(1);
+                }
 
-                controller->MakeRequest(request, colorPuf, TypesOfRequest::Deliver);
+                if (pthread_create(&thread_id[1], NULL, &MosquittoSub::WrapperCommand, ptrServerSub))
+                {
+                    printf("FAILED......");
+                    exit(1);
+                }
+                pthread_join(thread_id[0], NULL);
+                pthread_join(thread_id[1], NULL);
+
+                controller->MakeRequest(requestGlobal, requestGlobal.GetColor(), TypesOfRequest::Deliver);
                 
             }
 
-            if (request.GetType() == TypesOfRequest::System)
+            if (requestGlobal.GetType() == TypesOfRequest::System)
                 state = Disabling;
-            else if (request.GetType() == TypesOfRequest::Deliver)
+            else if (requestGlobal.GetType() == TypesOfRequest::Deliver)
                 state = DoDeliver;
             else
                 controller->GoHome();
@@ -97,11 +121,11 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
 
 
             //Setting destination
-            request.SetDestination(detector.SteppedDetection(frame, request.GetColor()));
+            requestGlobal.SetDestination(detector.SteppedDetection(frame, requestGlobal.GetColor()));
 
             MovementCalculation moveBot;
-            angle = moveBot.findAngle(massCenterTail, massCenterHead, request.GetDestination());
-            distance = moveBot.findDistanceToDestination(massCenterAverage, request.GetDestination());
+            angle = moveBot.findAngle(massCenterTail, massCenterHead, requestGlobal.GetDestination());
+            distance = moveBot.findDistanceToDestination(massCenterAverage, requestGlobal.GetDestination());
             std::cout << "Angle : " << angle << " Distance: " << distance << std::endl;
 
             // Deviation for if`s
@@ -145,7 +169,7 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
             //         cout << "The drink is being poured!" << endl;
             // }
             state = Running;
-            controller->FinishRequest(request);
+            controller->FinishRequest(requestGlobal);
             break;
         }
     }

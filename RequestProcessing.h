@@ -38,12 +38,13 @@ class Request
         }
 
         Request &operator= (Request &req);
-        void SetColor(Color color)             { this->colorPuf_ = color; }
-        void SetDestination(cv::Point2i point) { this->destination_ = point; }
-        void SetType(TypesOfRequest type)      { this->type_ = type; }
-        Color GetColor()                       { return colorPuf_; }
-        cv::Point2i GetDestination()           { return destination_; }
-        TypesOfRequest GetType()               { return type_; }
+        void SetColor(double hue, double saturation, double value);
+        void SetColor(Color color)                                  { this->colorPuf_ = color; }
+        void SetDestination(cv::Point2i point)                      { this->destination_ = point; }
+        void SetType(TypesOfRequest type)                           { this->type_ = type; }
+        Color GetColor()                                            { return colorPuf_; }
+        cv::Point2i GetDestination()                                { return destination_; }
+        TypesOfRequest GetType()                                    { return type_; }
 };
 
 class Controller

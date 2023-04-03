@@ -1,10 +1,13 @@
 #include "Mqtt.h"
+#include "RequestProcessing.h"
 
 //States to manage
 bool isConnected = false;
 bool isSubscribed = false;
 bool isRunning = true;
-bool inProcess = false;
+// bool inProcess = true;
+
+Request requestGlobal;
 
 void MqttSub::on_connect_cb(struct mosquitto *mosq, void *userdata, int result)
 {
@@ -25,12 +28,42 @@ void MqttSub::on_subscribe_cb(struct mosquitto *mosq, void *userdata, int mid, i
 
 void MqttSub::on_message_cb(struct mosquitto *mosq, void *userdata, const struct mosquitto_message *msg)
 {
-    if (inProcess)
-    {
-        printf((char *)msg->payload);
-        printf("\n");
+    // if (inProcess)
+    // {
+        std::string RecievedMsg = static_cast<std::string>(static_cast<char*>(msg->payload));
+        if (!strcmp(static_cast<char *>(msg->payload), "exit"))
+        {
+            std::vector<double> colorTemp(3);
+            std::string temp = "";
+            for (int i = 0; i < RecievedMsg.length(); i++)
+            {
+                if (RecievedMsg[i] == '(')
+                {
+                    i++;
+                    while (RecievedMsg[i] != ')')
+                    {
+                        if (RecievedMsg[i] == ',')
+                        {
+                            colorTemp.push_back(stod(temp));
+                            temp = "";
+                            i++;
+                            continue;
+                        }
+                        temp += RecievedMsg[i];
+                        i++;
+                    }
+                }
+            }
+
+            for (int i = 0; i < colorTemp.size(); i++)
+            {
+                printf("%lf\n",colorTemp[i]);
+            }
+
+            requestGlobal.SetColor(colorTemp[0], colorTemp[1], colorTemp[2]);
+        }
         fflush(stdout);
-    }
+    // }
 }
 
 void *MosquittoSub::Subscribe()
@@ -97,8 +130,7 @@ void *MosquittoSub::Command()
 {
     while(isRunning)
     {
-        printf(" >>>> COMMAND LIST <<<<\n");
-        printf("    start stop exit    \n"); 
+        printf(" >>>> MQTT SUB <<<<\n");
         char stdinbuf[1024];
         printf("\n");
         scanf("%s",stdinbuf);
@@ -108,40 +140,40 @@ void *MosquittoSub::Command()
         {
             isRunning = false;
         }
-        else if(!strcmp(stdinbuf, "start"))
-        {
-            if(inProcess)
-            {
-                printf("ALREADY START\n");
-                printf("\n");
-            }
-            else
-            {
-            inProcess = true;
-            printf("START RECIEVEING MESSAGE...\n");
-            printf("\n");
-            }
-        }
-        else if(!strcmp(stdinbuf, "stop"))
-        {
-            if(!inProcess)
-            {
-                printf("ALREADY STOP\n");
-                printf("\n");
-            }
-            else
-            {
-            inProcess = false;
-            printf("STOP RECIEVEING MESSAGE...\n");
-            printf("\n");
-            }
-        }
+        // else if(!strcmp(stdinbuf, "start"))
+        // {
+        //     if(inProcess)
+        //     {
+        //         printf("ALREADY START\n");
+        //         printf("\n");
+        //     }
+        //     else
+        //     {
+        //     inProcess = true;
+        //     printf("START RECIEVEING MESSAGE...\n");
+        //     printf("\n");
+        //     }
+        // }
+        // else if(!strcmp(stdinbuf, "stop"))
+        // {
+        //     if(!inProcess)
+        //     {
+        //         printf("ALREADY STOP\n");
+        //         printf("\n");
+        //     }
+        //     else
+        //     {
+        //     inProcess = false;
+        //     printf("STOP RECIEVEING MESSAGE...\n");
+        //     printf("\n");
+        //     }
+        // }
 
-        else 
-        {
-            printf("     UNKNOW COMMAND\n");
-            printf("\n");
-        }
+        // else 
+        // {
+        //     printf("     UNKNOW COMMAND\n");
+        //     printf("\n");
+        // }
     }
 }
 
