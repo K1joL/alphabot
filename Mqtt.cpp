@@ -1,13 +1,18 @@
 #include "Mqtt.h"
-#include "RequestProcessing.h"
+
 
 //States to manage
 bool isConnected = false;
 bool isSubscribed = false;
 bool isRunning = true;
-// bool inProcess = true;
+bool inProcess = true;
 
-Request requestGlobal;
+Request requestForReturn;
+
+Request MosquittoSub::GetReturned()
+{
+    return returnReq;
+}
 
 void MqttSub::on_connect_cb(struct mosquitto *mosq, void *userdata, int result)
 {
@@ -28,12 +33,12 @@ void MqttSub::on_subscribe_cb(struct mosquitto *mosq, void *userdata, int mid, i
 
 void MqttSub::on_message_cb(struct mosquitto *mosq, void *userdata, const struct mosquitto_message *msg)
 {
-    // if (inProcess)
-    // {
+    if (inProcess)
+    {
         std::string RecievedMsg = static_cast<std::string>(static_cast<char*>(msg->payload));
-        if (!strcmp(static_cast<char *>(msg->payload), "exit"))
+        if (strcmp(static_cast<char *>(msg->payload), "exit"))
         {
-            std::vector<double> colorTemp(3);
+            std::vector<double> colorTemp;
             std::string temp = "";
             for (int i = 0; i < RecievedMsg.length(); i++)
             {
@@ -52,18 +57,23 @@ void MqttSub::on_message_cb(struct mosquitto *mosq, void *userdata, const struct
                         temp += RecievedMsg[i];
                         i++;
                     }
+                    colorTemp.push_back(stod(temp));
+                    break;
                 }
             }
 
-            for (int i = 0; i < colorTemp.size(); i++)
-            {
-                printf("%lf\n",colorTemp[i]);
-            }
+            // for (int i = 0; i < colorTemp.size(); i++)
+            // {
+            //     printf("%lf\n",colorTemp[i]);
+            // }
 
-            requestGlobal.SetColor(colorTemp[0], colorTemp[1], colorTemp[2]);
-        }
+            requestForReturn.SetColor(colorTemp[0], colorTemp[1], colorTemp[2]);
+
+        }else
+            isRunning = false;
+
         fflush(stdout);
-    // }
+    }
 }
 
 void *MosquittoSub::Subscribe()
@@ -117,74 +127,21 @@ void *MosquittoSub::Subscribe()
     {
         usleep(100000);
     }
-  
     
+    isRunning = true;
+
     if (mosq)
     {
        mosquitto_destroy(mosq);
     }
     mosquitto_lib_cleanup();
-}
-
-void *MosquittoSub::Command()
-{
-    while(isRunning)
-    {
-        printf(" >>>> MQTT SUB <<<<\n");
-        char stdinbuf[1024];
-        printf("\n");
-        scanf("%s",stdinbuf);
-        printf("\n");
-
-        if(!strcmp(stdinbuf, "exit"))
-        {
-            isRunning = false;
-        }
-        // else if(!strcmp(stdinbuf, "start"))
-        // {
-        //     if(inProcess)
-        //     {
-        //         printf("ALREADY START\n");
-        //         printf("\n");
-        //     }
-        //     else
-        //     {
-        //     inProcess = true;
-        //     printf("START RECIEVEING MESSAGE...\n");
-        //     printf("\n");
-        //     }
-        // }
-        // else if(!strcmp(stdinbuf, "stop"))
-        // {
-        //     if(!inProcess)
-        //     {
-        //         printf("ALREADY STOP\n");
-        //         printf("\n");
-        //     }
-        //     else
-        //     {
-        //     inProcess = false;
-        //     printf("STOP RECIEVEING MESSAGE...\n");
-        //     printf("\n");
-        //     }
-        // }
-
-        // else 
-        // {
-        //     printf("     UNKNOW COMMAND\n");
-        //     printf("\n");
-        // }
-    }
+    this->returnReq = requestForReturn;
+    return NULL;
 }
 
 void *MosquittoSub::WrapperSubscribe(void *object)
 {
     return reinterpret_cast<MosquittoSub*>(object)->Subscribe();
-}
-
-void *MosquittoSub::WrapperCommand(void *object)
-{
-    return reinterpret_cast<MosquittoSub*>(object)->Command();
 }
 
 void MosquittoPub::SendToServer(const char *data)

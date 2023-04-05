@@ -5,7 +5,7 @@
 using namespace std;
 using namespace cv;
 
-void SetColor(Mat frame)
+void SetColor(Mat &frame, VideoCapture cap)
 {
     namedWindow("Result");
     namedWindow("Settings");
@@ -17,6 +17,7 @@ void SetColor(Mat frame)
     createTrackbar("v2", "Settings", 0, 255);
     while(true)
     {
+        cap >> frame;
         Mat frameHsv;
         cvtColor(frame, frameHsv, COLOR_BGR2HSV);
         int h1 = getTrackbarPos("h1", "Settings");
@@ -31,19 +32,28 @@ void SetColor(Mat frame)
         inRange(frameHsv, HsvMin, HsvMax, thresh);
         imshow("Result", thresh);
 
-        char ch = waitKey(1000);
+        char ch = waitKey(500);
         if (ch == 27)
             break;
     }
-    destroyAllWindows;
+    destroyAllWindows();
 }
 
 int main()
 {
+
     Controller controller;
     cv::VideoCapture Cap("/dev/video0");
 
-    controller.FiniteAutomate(Cap);
+    char c;
+    cout << "Enter \'s\' to set color of bot : " << endl;
+    cin >> c;
+    if(c == 's')
+    {
+        Mat frame;
+        SetColor(frame, Cap);
+    }else
+         controller.FiniteAutomate(Cap);
 
     return 0;
 }

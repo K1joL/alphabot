@@ -29,9 +29,8 @@ class Detector
 {
     public:
         cv::Mat TakeThresholdOfBlob(const cv::Mat &frameHSV, Color Color);
-        cv::Rect detectBlob(const cv::Mat &threshold);
-        // void SteppedDetection(const cv::Mat &frame, cv::Point2i *massCenter1, cv::Point2i *massCenter2, cv::Point2i *massCenterAverage, const Color &colorHsv1, const Color &colorHsv2);
-        cv::Point2i SteppedDetection(const cv::Mat &frame, Color colorHSV);
+        cv::Rect detectBlob(cv::Mat &frame, const cv::Mat &threshold);
+        cv::Point2i SteppedDetection(cv::Mat &frame, Color colorHSV);
         cv::Point2i GetMassCenter(cv::Rect rectangle);
         cv::Point2i GetMassCenter(cv::Point2i *center1, cv::Point2i *center2);
 };

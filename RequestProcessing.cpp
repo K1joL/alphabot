@@ -1,13 +1,18 @@
 #include "RequestProcessing.h"
 #include <pthread.h>
-
-extern Request requestGlobal;
+#include "Mqtt.h"
 
 void Request::SetColor(double hue, double saturation, double value)
 {
     colorPuf_[0] = hue;
     colorPuf_[1] = saturation;
     colorPuf_[2] = value;
+}
+
+void Request::SetDestination(cv::Point2i point)
+{
+    if (!this->destination_.x || !this->destination_.y)
+        this->destination_ = point;
 }
 
 Request &Request::operator=(Request &req)
@@ -48,12 +53,14 @@ void Controller::GoHome()
 void Controller::FiniteAutomate(cv::VideoCapture &cap)
 {
     MosquittoPub mosPub;
-    MosquittoSub *ptrServerSub = new MosquittoSub("localhost", "/telega");
-    pthread_t thread_id[2];
+    Detector detector;
     float angle = 0;
     int distance = 0;
-    Detector detector;
-    while (true)
+    cv::namedWindow("result", cv::WINDOW_AUTOSIZE);
+    
+    Request currentRequest;
+    bool isOn = true;
+    while (isOn)
     {
         Controller *controller = this;
         switch (state)
@@ -62,40 +69,31 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
         {
             // Making a request
             char c;
+            std::cout << "Enter \'d\' to deliver\n";
+            std::cout << "Enter \'e\' to exit\n";
             std::cin >> c;
             if (c == 'd')
             {
-                // std::cout << "Enter color of ottoman" << std::endl;
-                // int hue = 0, saturation = 0, value = 0;
-                // std::cout << "Hue: ";
-                // std::cin >> hue;
-                // std::cout << "Saturation: ";
-                // std::cin >> saturation;
-                // std::cout << "Value: ";
-                // std::cin >> value;
+                MosquittoSub ServerSub("localhost", "/telega");
+                ServerSub.Subscribe();
 
-                // Color colorPuf(hue, saturation, value);
-                if (pthread_create(&thread_id[0], NULL, &MosquittoSub::WrapperSubscribe, ptrServerSub))
+                for(int i = 0; i < 3; i++)
                 {
-                    printf("FAILED......");
-                    exit(1);
+                    std::cout << ServerSub.GetReturned().GetColor()[i] << " \n";
                 }
+                sleep(2);
+                currentRequest.SetColor(ServerSub.GetReturned().GetColor());
+                controller->MakeRequest(currentRequest, currentRequest.GetColor(), TypesOfRequest::Deliver);
 
-                if (pthread_create(&thread_id[1], NULL, &MosquittoSub::WrapperCommand, ptrServerSub))
-                {
-                    printf("FAILED......");
-                    exit(1);
-                }
-                pthread_join(thread_id[0], NULL);
-                pthread_join(thread_id[1], NULL);
-
-                controller->MakeRequest(requestGlobal, requestGlobal.GetColor(), TypesOfRequest::Deliver);
-                
+            }else if(c == 'e')
+            {
+                isOn = false;
+                break;
             }
 
-            if (requestGlobal.GetType() == TypesOfRequest::System)
+            if (currentRequest.GetType() == TypesOfRequest::System)
                 state = Disabling;
-            else if (requestGlobal.GetType() == TypesOfRequest::Deliver)
+            else if (currentRequest.GetType() == TypesOfRequest::Deliver)
                 state = DoDeliver;
             else
                 controller->GoHome();
@@ -111,22 +109,21 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
             if (frame.empty())
                 state = States::Running;
 
-            // Imitation of capturing camera
-            // cv::Mat frame = cv::imread("img_0.jpg");
-
             cv::Point2i massCenterHead = detector.SteppedDetection(frame, headColorHsv), 
             massCenterTail = detector.SteppedDetection(frame, tailColorHsv), 
             massCenterAverage = detector.GetMassCenter(&massCenterHead, &massCenterTail);
-            // detector.SteppedDetection(frame, &massCenterTail, &massCenterHead, &massCenterAverage, tailColorHsv, headColorHsv);
-
 
             //Setting destination
-            requestGlobal.SetDestination(detector.SteppedDetection(frame, requestGlobal.GetColor()));
+            currentRequest.SetDestination(detector.SteppedDetection(frame, currentRequest.GetColor()));
+            std::cout << currentRequest.GetDestination() << std::endl;
 
             MovementCalculation moveBot;
-            angle = moveBot.findAngle(massCenterTail, massCenterHead, requestGlobal.GetDestination());
-            distance = moveBot.findDistanceToDestination(massCenterAverage, requestGlobal.GetDestination());
+            angle = moveBot.findAngle(massCenterTail, massCenterHead, currentRequest.GetDestination());
+            distance = moveBot.findDistanceToDestination(massCenterAverage, currentRequest.GetDestination());
             std::cout << "Angle : " << angle << " Distance: " << distance << std::endl;
+
+            cv::imshow("result", frame);
+            cv::waitKey(500);
 
             // Deviation for if`s
             float errorAngle = 0.1;
@@ -169,8 +166,9 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
             //         cout << "The drink is being poured!" << endl;
             // }
             state = Running;
-            controller->FinishRequest(requestGlobal);
+            controller->FinishRequest(currentRequest);
             break;
         }
     }
+    cv::destroyAllWindows;
 }

@@ -35,7 +35,7 @@ cv::Mat Detector::TakeThresholdOfBlob(const cv::Mat &frameHSV, Color color)
 {
     cv::Mat threshold;
     //vectors of HSV color that need to find. Make a range using Offset
-    uint8_t Offset = 5;
+    uint8_t Offset = 10;
     std::vector <uint8_t> HsvMin = {static_cast<uint8_t>(color[0] - Offset),100,100};
     std::vector <uint8_t> HsvMax = {static_cast<uint8_t>(color[0] + Offset),255,255};
     
@@ -46,7 +46,7 @@ cv::Mat Detector::TakeThresholdOfBlob(const cv::Mat &frameHSV, Color color)
     return threshold;
 }
 
-cv::Rect Detector::detectBlob(const cv::Mat &threshold)
+cv::Rect Detector::detectBlob(cv::Mat &frame, const cv::Mat &threshold)
 {
     cv::Rect rectangle;
     std::vector<std::vector<cv::Point>> contours;
@@ -61,55 +61,33 @@ cv::Rect Detector::detectBlob(const cv::Mat &threshold)
     for(size_t i = 0; i < contours.size(); i++)
     {
         int area = minRect[i].size.height*minRect[i].size.width;
-        int minArea = 10'000;
+        int minArea = 5'000;
         if(area > minArea)
         {
             rectangle = minRect[i].boundingRect();
             //Uncomment if you want to see Rectangles on image
-            // Point2f rect_points[4];
-            // minRect[i].points( rect_points );
-            // for ( int j = 0; j < 4; j++ )
-            // {
-            //     line( threshold, rect_points[j], rect_points[(j+1)%4], (0,0,255) );
-            // }
+            cv::Point2f rect_points[4];
+            minRect[i].points( rect_points );
+            for ( int j = 0; j < 4; j++ )
+            {
+                line( frame, rect_points[j], rect_points[(j+1)%4], (0,0,255) );
+            }
         }
     }
-    // imshow("Result", threshold);
+    // imshow("result", threshold);
     // waitKey();
     return rectangle;
 }
 
-cv::Point2i Detector::SteppedDetection(const cv::Mat &frame, Color colorHSV)
+cv::Point2i Detector::SteppedDetection(cv::Mat &frame, Color colorHSV)
 {
     cv::Mat frameHSV, threshold;
     cv::Rect rectangleOfColor;
 
     cvtColor(frame, frameHSV, cv::COLOR_BGR2HSV);
     threshold = TakeThresholdOfBlob(frameHSV, colorHSV);
-    rectangleOfColor = detectBlob(threshold);
-    
+    rectangleOfColor = detectBlob(frame, threshold);
+
     return GetMassCenter(rectangleOfColor);
 }
-
-//NEED REFACTORING
-// void Detector::SteppedDetection(const cv::Mat &frame, cv::Point2i *massCenter1, cv::Point2i *massCenter2, cv::Point2i *massCenterAverage, const Color &colorHsv1, const Color &colorHsv2)
-// {
-//     cv::Mat frameHSV, threshold;
-
-//     // converting the Frame to FrameHsv color model
-//     cvtColor(frame, frameHSV, cv::COLOR_BGR2HSV);
-
-//     threshold = TakeThresholdOfBlob(frameHSV, colorHsv1);
-//     cv::Rect rectangleOfColor = detectBlob(threshold);
-//     *massCenter1 = GetMassCenter(rectangleOfColor);
-//     // just for tests
-//     //  cout << RectangleOfMagenta << endl;
-
-//     threshold = TakeThresholdOfBlob(frameHSV, colorHsv2);
-//     rectangleOfColor = detectBlob(threshold);
-//     *massCenter2 = GetMassCenter(rectangleOfColor);
-//     // just for tests
-//     //  cout << RectangleOfBlue << endl;
-//     *massCenterAverage = GetMassCenter(massCenter1, massCenter2);
-// }
 
