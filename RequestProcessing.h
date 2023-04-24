@@ -6,6 +6,8 @@
 
 #include "ImageProcessing.h"
 
+const double PIXELS_PER_SECOND = 100;
+
 class MosquittoPub;
 class MosquittoSub;
 

@@ -35,14 +35,22 @@ void Controller::FinishRequest(Request &req)
 
 void Controller::Move(int distance, MosquittoPub &mosPub)
 {
+    MqttMessage mes{"forward", (1.0)};
     std::cout << "Moving " << distance << std::endl;
-    mosPub.Publish("Moving");
+    mosPub.Publish(&mes);
 }
 
 void Controller::Rotate(float angle, MosquittoPub &mosPub)
 {
-    std::cout << "Rotating to " << angle * 180/ M_PIf << std::endl;
-    mosPub.Publish("Rotating");
+    MqttMessage mes;
+    std::cout << "Rotating to " << acos(angle) * 180/ M_PIf << std::endl;
+
+    if (angle < 0)
+        mes = {"left", 1.0};
+    else
+        mes = {"right", 1.0};
+
+    mosPub.Publish(&mes);
 }
 
 void Controller::GoHome()
@@ -54,7 +62,7 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
 {
     MosquittoPub mosPub;
     Detector detector;
-    float angle = 0;
+    float angleInCos = 0;
     int distance = 0;
     cv::namedWindow("result", cv::WINDOW_AUTOSIZE);
     
@@ -118,17 +126,17 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
             std::cout << currentRequest.GetDestination() << std::endl;
 
             MovementCalculation moveBot;
-            angle = moveBot.findAngle(massCenterTail, massCenterHead, currentRequest.GetDestination());
+            angleInCos = moveBot.findAngle(massCenterTail, massCenterHead, currentRequest.GetDestination());
             distance = moveBot.findDistanceToDestination(massCenterAverage, currentRequest.GetDestination());
-            std::cout << "Angle : " << angle << " Distance: " << distance << std::endl;
+            std::cout << "Angle : " << angleInCos << " Distance: " << distance << std::endl;
 
             cv::imshow("result", frame);
             cv::waitKey(500);
 
             // Deviation for if`s
             float errorAngle = 0.1;
-            int errorDist = 100;
-            if (angle > errorAngle || angle < (-errorAngle))
+            int errorDist = 400;
+            if (acos(angleInCos) > errorAngle)
             {
                 state = States::Rotate;
                 break;
@@ -154,7 +162,7 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
 
         case States::Rotate:
             state = DoDeliver;
-            controller->Rotate(angle, mosPub);
+            controller->Rotate(angleInCos, mosPub);
             break;
 
         case States::Waiting:

@@ -36,6 +36,12 @@ public:
     static void SetState(bool &state, bool mode){state = mode;}
 };
 
+struct MqttMessage
+{
+    char* command;
+    double seconds;
+};
+
 namespace MqttSub
 {
     void on_connect_cb(struct mosquitto *mosq, void *userdata, int result);
@@ -61,9 +67,8 @@ public:
     {
     }
     void SendToServer(const char *data);
-    void *Publish(const char *message);
+    void *Publish(const MqttMessage* message);
 };
-
 
 
 #endif

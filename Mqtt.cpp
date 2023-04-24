@@ -154,13 +154,15 @@ void MosquittoPub::SendToServer(const char *data)
     mosquitto_destroy(mosq);
 }
 
-void *MosquittoPub::Publish(const char *message)
+void *MosquittoPub::Publish(const MqttMessage* message)
 {
     json_object *json_obj;
     json_obj = json_tokener_parse("{}");
     const char *json_str;
 
-    json_object_object_add(json_obj, "Command", json_object_new_string(message));
+    json_object_object_add(json_obj, "cmd", json_object_new_string(message->command));
+    json_object_object_add(json_obj, "value", json_object_new_double(message->seconds));
+
     json_str = json_object_get_string(json_obj);
     SendToServer(json_str);
 

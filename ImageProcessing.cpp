@@ -4,9 +4,9 @@ float MovementCalculation::findAngle(cv::Point2i massCenter1, cv::Point2i massCe
 {
     int CenterX = int(massCenter1.x + massCenter2.x)/2;
     int CenterY = int(massCenter1.y + massCenter2.y)/2;
-    float angleInRadian = static_cast<float>(acos(((massCenter1.x - CenterX) * (CenterX - dest.x) + (massCenter1.y - CenterY) * (CenterY - dest.y))/
-                            (sqrt(pow((massCenter1.x - CenterX), 2) + pow((massCenter1.y - CenterY), 2)) * sqrt(pow((CenterX - dest.x), 2) + pow((CenterY - dest.y), 2)))));
-    return angleInRadian;
+    float angleInCos = static_cast<float>(((massCenter1.x - CenterX) * (CenterX - dest.x) + (massCenter1.y - CenterY) * (CenterY - dest.y))/
+                            (sqrt(pow((massCenter1.x - CenterX), 2) + pow((massCenter1.y - CenterY), 2)) * sqrt(pow((CenterX - dest.x), 2) + pow((CenterY - dest.y), 2))));
+    return angleInCos;
 }
 
 int MovementCalculation::findDistanceToDestination(cv::Point2i averageCenter, cv::Point2i dest)
