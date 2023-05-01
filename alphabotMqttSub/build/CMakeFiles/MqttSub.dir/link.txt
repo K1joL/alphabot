@@ -1,0 +1,1 @@
+/usr/bin/c++ -rdynamic CMakeFiles/MqttSub.dir/MqttSub.cpp.o CMakeFiles/MqttSub.dir/Subscriber.cpp.o -o MqttSub  /usr/lib/x86_64-linux-gnu/libjson-c.so.5.1.0 -lmosquitto 

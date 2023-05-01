@@ -1,0 +1,3 @@
+/home/k1jol/alphabotMqttSub/build/CMakeFiles/MqttSub.dir
+/home/k1jol/alphabotMqttSub/build/CMakeFiles/edit_cache.dir
+/home/k1jol/alphabotMqttSub/build/CMakeFiles/rebuild_cache.dir
