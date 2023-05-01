@@ -4,9 +4,16 @@ float MovementCalculation::findAngle(cv::Point2i massCenter1, cv::Point2i massCe
 {
     int CenterX = int(massCenter1.x + massCenter2.x)/2;
     int CenterY = int(massCenter1.y + massCenter2.y)/2;
-    float angleInCos = static_cast<float>(((massCenter1.x - CenterX) * (CenterX - dest.x) + (massCenter1.y - CenterY) * (CenterY - dest.y))/
-                            (sqrt(pow((massCenter1.x - CenterX), 2) + pow((massCenter1.y - CenterY), 2)) * sqrt(pow((CenterX - dest.x), 2) + pow((CenterY - dest.y), 2))));
-    return angleInCos;
+    // float angleInCos = static_cast<float>(((massCenter1.x - CenterX) * (CenterX - dest.x) + (massCenter1.y - CenterY) * (CenterY - dest.y))/
+    //                         (sqrt(pow((massCenter1.x - CenterX), 2) + pow((massCenter1.y - CenterY), 2)) * sqrt(pow((CenterX - dest.x), 2) + pow((CenterY - dest.y), 2))));
+    float k1;
+    float k2;
+    k1 = (static_cast<float>(CenterY) - massCenter2.y) / (CenterX - massCenter2.x);
+    k2 = (dest.y - static_cast<float>(CenterY)) / (dest.x - CenterX);
+    float angleInTan = 0;
+    if(1+k1*k2)
+        angleInTan = (k2-k1)/(1+k1*k2);
+    return angleInTan;
 }
 
 int MovementCalculation::findDistanceToDestination(cv::Point2i averageCenter, cv::Point2i dest)
@@ -35,14 +42,15 @@ cv::Mat Detector::TakeThresholdOfBlob(const cv::Mat &frameHSV, Color color)
 {
     cv::Mat threshold;
     //vectors of HSV color that need to find. Make a range using Offset
-    uint8_t Offset = 10;
-    std::vector <uint8_t> HsvMin = {static_cast<uint8_t>(color[0] - Offset),100,100};
-    std::vector <uint8_t> HsvMax = {static_cast<uint8_t>(color[0] + Offset),255,255};
-    
+    uint8_t Offset = 15;
+    std::vector<uint8_t> HsvMin = {static_cast<uint8_t>(color[0] - Offset), static_cast<uint8_t>(color[1] - Offset), static_cast<uint8_t>(color[2] - Offset)};
+    std::vector<uint8_t> HsvMax = {static_cast<uint8_t>(color[0] + Offset), 255, 255};
+
     //Make result image matrix with found color
     inRange(frameHSV, HsvMin, HsvMax, threshold);
     //Creating the image in white&black with area of needed color 
-    // imshow( "FrameResult.jpg", threshold );
+    // cv::imshow( "FrameResult.jpg", threshold );
+    // cv::waitKey(1000);
     return threshold;
 }
 
@@ -61,7 +69,7 @@ cv::Rect Detector::detectBlob(cv::Mat &frame, const cv::Mat &threshold)
     for(size_t i = 0; i < contours.size(); i++)
     {
         int area = minRect[i].size.height*minRect[i].size.width;
-        int minArea = 5'000;
+        int minArea = 500;
         if(area > minArea)
         {
             rectangle = minRect[i].boundingRect();
@@ -70,7 +78,7 @@ cv::Rect Detector::detectBlob(cv::Mat &frame, const cv::Mat &threshold)
             minRect[i].points( rect_points );
             for ( int j = 0; j < 4; j++ )
             {
-                line( frame, rect_points[j], rect_points[(j+1)%4], (0,0,255) );
+                line( frame, rect_points[j], rect_points[(j+1)%4], (0,0,0) );
             }
         }
     }

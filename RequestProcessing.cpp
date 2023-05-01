@@ -43,12 +43,8 @@ void Controller::Move(int distance, MosquittoPub &mosPub)
 void Controller::Rotate(float angle, MosquittoPub &mosPub)
 {
     MqttMessage mes;
-    std::cout << "Rotating to " << acos(angle) * 180/ M_PIf << std::endl;
-
-    if (angle < 0)
-        mes = {"left", 1.0};
-    else
-        mes = {"right", 1.0};
+    std::cout << "Rotating to " << atan(angle) * 180/ M_PIf << std::endl;
+    mes = {"left", 1.0};
 
     mosPub.Publish(&mes);
 }
@@ -62,10 +58,14 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
 {
     MosquittoPub mosPub;
     Detector detector;
-    float angleInCos = 0;
+    float angle = 0;
     int distance = 0;
-    cv::namedWindow("result", cv::WINDOW_AUTOSIZE);
+    cv::namedWindow("result", cv::WINDOW_NORMAL);
     
+    cv::Point2i massCenterHead,
+                massCenterTail,
+                massCenterAverage;
+
     Request currentRequest;
     bool isOn = true;
     while (isOn)
@@ -118,25 +118,29 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
                 state = States::Running;
 
             cv::Point2i massCenterHead = detector.SteppedDetection(frame, headColorHsv), 
-            massCenterTail = detector.SteppedDetection(frame, tailColorHsv), 
-            massCenterAverage = detector.GetMassCenter(&massCenterHead, &massCenterTail);
+                        massCenterTail = detector.SteppedDetection(frame, tailColorHsv), 
+                        massCenterAverage = detector.GetMassCenter(&massCenterHead, &massCenterTail);
 
             //Setting destination
             currentRequest.SetDestination(detector.SteppedDetection(frame, currentRequest.GetColor()));
             std::cout << currentRequest.GetDestination() << std::endl;
-
+            
             MovementCalculation moveBot;
-            angleInCos = moveBot.findAngle(massCenterTail, massCenterHead, currentRequest.GetDestination());
+            angle = moveBot.findAngle(massCenterTail, massCenterHead, currentRequest.GetDestination());
             distance = moveBot.findDistanceToDestination(massCenterAverage, currentRequest.GetDestination());
-            std::cout << "Angle : " << angleInCos << " Distance: " << distance << std::endl;
+            std::cout << "Angle : " << angle << " Distance: " << distance << std::endl;
+            
+            //draw angle lines
+            line(frame, static_cast<cv::Point>(massCenterHead),static_cast<cv::Point>(massCenterAverage), (255, 0, 0));
+            line(frame, static_cast<cv::Point>(massCenterAverage),static_cast<cv::Point>(currentRequest.GetDestination()), (0, 255, 0));
 
             cv::imshow("result", frame);
             cv::waitKey(500);
 
             // Deviation for if`s
             float errorAngle = 0.1;
-            int errorDist = 400;
-            if (acos(angleInCos) > errorAngle)
+            int errorDist = 300;
+            if (atan(angle) > errorAngle || atan(angle) < -errorAngle )
             {
                 state = States::Rotate;
                 break;
@@ -162,7 +166,7 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
 
         case States::Rotate:
             state = DoDeliver;
-            controller->Rotate(angleInCos, mosPub);
+            controller->Rotate(angle, mosPub);
             break;
 
         case States::Waiting:

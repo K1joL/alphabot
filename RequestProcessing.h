@@ -47,17 +47,17 @@ class Request
         void SetColor(Color color)                                  { this->colorPuf_ = color; }
         void SetType(TypesOfRequest type)                           { this->type_ = type; }
         Color GetColor()                                            { return colorPuf_; }
-        cv::Point2i GetDestination()                                { return destination_; }
+        cv::Point2i& GetDestination()                                { return destination_; }
         TypesOfRequest GetType()                                    { return type_; }
 };
 
 class Controller
 {
     private:
-        Color tailColorHsv{100, 0, 0};
-        Color headColorHsv{166, 0, 0};
+        Color tailColorHsv{110, 170, 100};
+        Color headColorHsv{160, 170, 100};
         States state = Running;
-
+        
     public:
         void MakeRequest(Request &req, Color colorPuf, TypesOfRequest type);
         void FinishRequest(Request &req);
