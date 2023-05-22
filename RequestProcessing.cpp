@@ -1,6 +1,5 @@
 #include "RequestProcessing.h"
-#include <pthread.h>
-#include "Mqtt.h"
+        #include <string.h>
 
 void Request::SetColor(double hue, double saturation, double value)
 {
@@ -11,6 +10,7 @@ void Request::SetColor(double hue, double saturation, double value)
 
 void Request::SetDestination(cv::Point2i point)
 {
+
     if (!this->destination_.x || !this->destination_.y)
         this->destination_ = point;
 }
@@ -33,20 +33,20 @@ void Controller::FinishRequest(Request &req)
     req.SetType(TypesOfRequest::None);
 }
 
-void Controller::Move(int distance, MosquittoPub &mosPub)
+void Controller::Move(int distance)
 {
-    MqttMessage mes{"forward", (1.0)};
-    std::cout << "Moving " << distance << std::endl;
-    mosPub.Publish(&mes);
+    const char *cmd = ChooseTheCommand(distance);
+    myMosq::MqttMessage mes{cmd, (1.0)};
+    
+    mosq_->Publish(&mes);
 }
 
-void Controller::Rotate(float angle, MosquittoPub &mosPub)
+void Controller::Rotate(float cosOfAngle)
 {
-    MqttMessage mes;
-    std::cout << "Rotating to " << atan(angle) * 180/ M_PIf << std::endl;
-    mes = {"left", 1.0};
-
-    mosPub.Publish(&mes);
+    // const char* cmd = ChooseTheCommand(cosOfAngle);
+    const char* cmd = "right";
+    myMosq::MqttMessage mes{cmd, 1.0};
+    mosq_->Publish(&mes);
 }
 
 void Controller::GoHome()
@@ -56,22 +56,18 @@ void Controller::GoHome()
 
 void Controller::FiniteAutomate(cv::VideoCapture &cap)
 {
-    MosquittoPub mosPub;
+    mosq_ = std::make_shared<myMosq>("localhost", "/telega", "abot/command/alex");
     Detector detector;
-    float angle = 0;
+    float cosOfAngle = 0;
     int distance = 0;
     cv::namedWindow("result", cv::WINDOW_NORMAL);
-    
-    cv::Point2i massCenterHead,
-                massCenterTail,
-                massCenterAverage;
 
     Request currentRequest;
     bool isOn = true;
     while (isOn)
     {
         Controller *controller = this;
-        switch (state)
+        switch (state_)
         {
         case States::Running:
         {
@@ -82,77 +78,84 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
             std::cin >> c;
             if (c == 'd')
             {
-                MosquittoSub ServerSub("localhost", "/telega");
-                ServerSub.Subscribe();
+                mosq_->Subscribe();
 
-                for(int i = 0; i < 3; i++)
+                for (int i = 0; i < 3; i++)
                 {
-                    std::cout << ServerSub.GetReturned().GetColor()[i] << " \n";
+                    std::cout << mosq_->GetMessage()[i] << " \n";
                 }
                 sleep(2);
-                currentRequest.SetColor(ServerSub.GetReturned().GetColor());
+                currentRequest.SetColor(mosq_->GetMessage());
                 controller->MakeRequest(currentRequest, currentRequest.GetColor(), TypesOfRequest::Deliver);
-
-            }else if(c == 'e')
+            }
+            else if (c == 'e')
             {
                 isOn = false;
                 break;
             }
 
             if (currentRequest.GetType() == TypesOfRequest::System)
-                state = Disabling;
+                state_ = Disabling;
             else if (currentRequest.GetType() == TypesOfRequest::Deliver)
-                state = DoDeliver;
+                state_ = DoDeliver;
             else
                 controller->GoHome();
             break;
         }
+
         case States::DoDeliver:
         {
             cv::Mat frame;
             // Capture frame-by-frame
             cap >> frame;
+            // std::string base = "target.png";
+            // std::string file = base;
+            // frame = cv::imread(file.insert(6, std::to_string(i)));
 
             // If the frame is empty, break immediately
             if (frame.empty())
-                state = States::Running;
+                state_ = States::Running;
 
-            cv::Point2i massCenterHead = detector.SteppedDetection(frame, headColorHsv), 
-                        massCenterTail = detector.SteppedDetection(frame, tailColorHsv), 
-                        massCenterAverage = detector.GetMassCenter(&massCenterHead, &massCenterTail);
+            // Detecting robot
+            bot_.head = detector.SteppedDetection(frame, headColorHsv_);
+            bot_.tail = detector.SteppedDetection(frame, tailColorHsv_);
+            cv::Point2i massCenterAverage = detector.GetMassCenter(bot_.head, bot_.tail);
 
-            //Setting destination
+            // Setting destination
             currentRequest.SetDestination(detector.SteppedDetection(frame, currentRequest.GetColor()));
             std::cout << currentRequest.GetDestination() << std::endl;
-            
-            MovementCalculation moveBot;
-            angle = moveBot.findAngle(massCenterTail, massCenterHead, currentRequest.GetDestination());
-            distance = moveBot.findDistanceToDestination(massCenterAverage, currentRequest.GetDestination());
-            std::cout << "Angle : " << angle << " Distance: " << distance << std::endl;
-            
-            //draw angle lines
-            line(frame, static_cast<cv::Point>(massCenterHead),static_cast<cv::Point>(massCenterAverage), (255, 0, 0));
-            line(frame, static_cast<cv::Point>(massCenterAverage),static_cast<cv::Point>(currentRequest.GetDestination()), (0, 255, 0));
+            std::cout << "Bot: H: " << bot_.head << " T: " << bot_.tail << std::endl;
 
+            MovementCalculation moveBot;
+            cosOfAngle = moveBot.findAngle(bot_.head, massCenterAverage, currentRequest.GetDestination());
+            distance = moveBot.findDistanceToDestination(massCenterAverage, currentRequest.GetDestination());
+            std::cout << "Angle : " << cosOfAngle << " Distance: " << distance << std::endl;
+
+            // draw angle lines
+            line(frame, static_cast<cv::Point>(bot_.head), static_cast<cv::Point>(massCenterAverage), (255, 0, 0));
+            line(frame, static_cast<cv::Point>(massCenterAverage), static_cast<cv::Point>(currentRequest.GetDestination()), (0, 255, 0));
+
+            cv::resize(frame, frame, cv::Size(frame.cols/3,frame.rows/3));
             cv::imshow("result", frame);
-            cv::waitKey(500);
+            cv::waitKey(100);
 
             // Deviation for if`s
-            float errorAngle = 0.1;
-            int errorDist = 300;
-            if (atan(angle) > errorAngle || atan(angle) < -errorAngle )
+            float errorAngle = 15;
+            float angle = acos(cosOfAngle) * 180 / M_PIf;
+            int errorDist = 100;
+            if ( angle > errorAngle )
             {
-                state = States::Rotate;
+                state_ = States::Rotate;
                 break;
             }
             else if (distance > errorDist)
             {
-                state = States::Move;
+                state_ = States::Move;
                 break;
             }
             else
             {
-                state = Waiting;
+                state_ = Waiting;
                 break;
             }
 
@@ -160,13 +163,15 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
         }
 
         case States::Move:
-            state = DoDeliver;
-            controller->Move(distance, mosPub);
+            std::cout << "Moving " << distance << std::endl;
+            state_ = DoDeliver;
+            controller->Move(distance);
             break;
 
         case States::Rotate:
-            state = DoDeliver;
-            controller->Rotate(angle, mosPub);
+            std::cout << "Rotating to " << atan(cosOfAngle) * 180 / M_PIf << std::endl;
+            state_ = DoDeliver;
+            controller->Rotate(cosOfAngle);
             break;
 
         case States::Waiting:
@@ -177,10 +182,43 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
             //     if(CloseToDispenser())
             //         cout << "The drink is being poured!" << endl;
             // }
-            state = Running;
+            state_ = Running;
             controller->FinishRequest(currentRequest);
             break;
         }
     }
     cv::destroyAllWindows;
+}
+
+const char *Controller::ChooseTheCommand(int distance)
+{
+    return "forward";
+}
+
+const char *Controller::ChooseTheCommand(float cosOfAngle)
+{
+    if (cosOfAngle > 0)
+    {
+        if (bot_.tail.x < bot_.head.x)
+            if (bot_.tail.y < bot_.head.y)
+                return "left";
+            else
+                return "right";
+        else if (bot_.tail.y > bot_.head.y)
+            return "left";
+        else
+            return "right";
+    }
+    else
+    {
+        if (bot_.tail.x < bot_.head.x)
+            if (bot_.tail.y > bot_.head.y)
+                return "left";
+            else
+                return "right";
+        else if (bot_.tail.y < bot_.head.y)
+            return "left";
+        else
+            return "right";
+    }
 }

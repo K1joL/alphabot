@@ -1,28 +1,27 @@
 #include "ImageProcessing.h"
 
-float MovementCalculation::findAngle(cv::Point2i massCenter1, cv::Point2i massCenter2, cv::Point2i dest)
+float MovementCalculation::findAngle(const cv::Point2i &massCenter1, const cv::Point2i &massCenter2,  const cv::Point2i &massCenter3)
 {
-    int CenterX = int(massCenter1.x + massCenter2.x)/2;
-    int CenterY = int(massCenter1.y + massCenter2.y)/2;
-    // float angleInCos = static_cast<float>(((massCenter1.x - CenterX) * (CenterX - dest.x) + (massCenter1.y - CenterY) * (CenterY - dest.y))/
-    //                         (sqrt(pow((massCenter1.x - CenterX), 2) + pow((massCenter1.y - CenterY), 2)) * sqrt(pow((CenterX - dest.x), 2) + pow((CenterY - dest.y), 2))));
-    float k1;
-    float k2;
-    k1 = (static_cast<float>(CenterY) - massCenter2.y) / (CenterX - massCenter2.x);
-    k2 = (dest.y - static_cast<float>(CenterY)) / (dest.x - CenterX);
-    float angleInTan = 0;
-    if(1+k1*k2)
-        angleInTan = (k2-k1)/(1+k1*k2);
-    return angleInTan;
+    //normal vectors n(A,B)
+    float A1, A2, B1, B2;
+    A1 = massCenter1.x - massCenter2.x;
+    A2 = massCenter2.x - massCenter3.x;
+    B1 = massCenter1.y - massCenter2.y;
+    B2 = massCenter2.y - massCenter3.y;
+
+    float CosOfAngle = static_cast<float>(
+        (A1 * A2 + B1 * B2) /
+        (sqrt(pow(A1, 2) + pow(B1, 2)) * sqrt(pow(A2, 2) + pow(B2, 2))));
+    return CosOfAngle;
 }
 
-int MovementCalculation::findDistanceToDestination(cv::Point2i averageCenter, cv::Point2i dest)
+int MovementCalculation::findDistanceToDestination(const cv::Point2i &averageCenter, const cv::Point2i &destination)
 {
-    int distanceInPixel = sqrt(pow((averageCenter.x - dest.x),2) + pow((averageCenter.y - dest.y),2));
+    int distanceInPixel = sqrt(pow((averageCenter.x - destination.x),2) + pow((averageCenter.y - destination.y),2));
     return distanceInPixel;
 }
 
-cv::Point2i Detector::GetMassCenter(cv::Rect rectangle)
+cv::Point2i Detector::GetMassCenter(const cv::Rect &rectangle)
 {
     cv::Point2i TopLeftPointRect = rectangle.tl();
     cv::Point2i BottomRightPointRect = rectangle.br();
@@ -31,10 +30,10 @@ cv::Point2i Detector::GetMassCenter(cv::Rect rectangle)
     return cv::Point2i(X, Y);
 }
 
-cv::Point2i Detector::GetMassCenter(cv::Point2i *center1, cv::Point2i *center2)
+cv::Point2i Detector::GetMassCenter(const cv::Point2i &center1, const cv::Point2i &center2)
 {
-    int X = (center1->x + center2->x) / 2;
-    int Y = (center1->y + center2->y) / 2;
+    int X = (center1.x + center2.x) / 2;
+    int Y = (center1.y + center2.y) / 2;
     return cv::Point2i(X, Y);
 }
 
@@ -58,7 +57,6 @@ cv::Rect Detector::detectBlob(cv::Mat &frame, const cv::Mat &threshold)
 {
     cv::Rect rectangle;
     std::vector<std::vector<cv::Point>> contours;
-    std::vector<cv::Vec4i> hierarchy;
 
     findContours(threshold, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
     
@@ -68,8 +66,8 @@ cv::Rect Detector::detectBlob(cv::Mat &frame, const cv::Mat &threshold)
     
     for(size_t i = 0; i < contours.size(); i++)
     {
-        int area = minRect[i].size.height*minRect[i].size.width;
-        int minArea = 500;
+        int area = minRect[i].size.area();
+        int minArea = 1500;
         if(area > minArea)
         {
             rectangle = minRect[i].boundingRect();

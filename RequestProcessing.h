@@ -3,13 +3,12 @@
 
 #include "opencv2/opencv.hpp"
 #include <iostream>
+#include <memory>
 
 #include "ImageProcessing.h"
+#include "Mqtt.h"
 
 const double PIXELS_PER_SECOND = 100;
-
-class MosquittoPub;
-class MosquittoSub;
 
 enum class TypesOfRequest{
     System = -1, 
@@ -25,6 +24,12 @@ enum States{
         Waiting,
         Disabling
     };
+
+struct AlphaBot
+        {
+            cv::Point2i head = {0,0};
+            cv::Point2i tail = {0,0};
+        };
 
 class Request
 {
@@ -54,17 +59,21 @@ class Request
 class Controller
 {
     private:
-        Color tailColorHsv{110, 170, 100};
-        Color headColorHsv{160, 170, 100};
-        States state = Running;
-        
+        Color tailColorHsv_{110, 140, 100};
+        Color headColorHsv_{160, 140, 100};
+        States state_ = Running;
+        std::shared_ptr<myMosq> mosq_;
+        AlphaBot bot_;
+
     public:
         void MakeRequest(Request &req, Color colorPuf, TypesOfRequest type);
         void FinishRequest(Request &req);
-        void Move(int distance, MosquittoPub &mosPub);
-        void Rotate(float angle, MosquittoPub &mosPub);
+        void Move(int distance);
+        void Rotate(float angle);
         void GoHome();
         void FiniteAutomate(cv::VideoCapture &cap);
+        const char *ChooseTheCommand(int distance);
+        const char *ChooseTheCommand(float cosOfAngle);
 };
 
 #endif

@@ -6,23 +6,23 @@
 class Color
 {
     private:
-        double colorHsv[3];
+        std::vector<double> color_ =  {0,0,0};
     public:
-        Color() : colorHsv{} 
+        Color(std::vector<double> color) : color_{color} 
         {
         }
         Color(double hue, double saturation, double value)
-            : colorHsv{hue, saturation, value}
+            : color_{hue, saturation, value}
         {
         }
-        double &operator[](int index) { return colorHsv[index]; }
+        double &operator[](int index) { return color_[index]; }
 };
 
 class MovementCalculation
 {
     public:
-        float findAngle(cv::Point2i massCenter1, cv::Point2i massCenter2, cv::Point2i destination);
-        int findDistanceToDestination(cv::Point2i averageCenter, cv::Point2i destination);
+        float findAngle(const cv::Point2i &massCenter1, const cv::Point2i &massCenter2, const cv::Point2i &massCenter3);
+        int findDistanceToDestination(const cv::Point2i &averageCenter, const cv::Point2i &destination);
 };
 
 class Detector
@@ -31,8 +31,8 @@ class Detector
         cv::Mat TakeThresholdOfBlob(const cv::Mat &frameHSV, Color Color);
         cv::Rect detectBlob(cv::Mat &frame, const cv::Mat &threshold);
         cv::Point2i SteppedDetection(cv::Mat &frame, Color colorHSV);
-        cv::Point2i GetMassCenter(cv::Rect rectangle);
-        cv::Point2i GetMassCenter(cv::Point2i *center1, cv::Point2i *center2);
+        cv::Point2i GetMassCenter(const cv::Rect &rectangle);
+        cv::Point2i GetMassCenter(const cv::Point2i &center1, const cv::Point2i &center2);
 };
 
 #endif
