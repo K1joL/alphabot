@@ -1,6 +1,6 @@
 #include "ImageProcessing.h"
 
-float MovementCalculation::findAngle(const cv::Point2i &massCenter1, const cv::Point2i &massCenter2,  const cv::Point2i &massCenter3)
+float Detector::findAngle(const cv::Point2i &massCenter1, const cv::Point2i &massCenter2,  const cv::Point2i &massCenter3)
 {
     //normal vectors n(A,B)
     float A1, A2, B1, B2;
@@ -15,7 +15,7 @@ float MovementCalculation::findAngle(const cv::Point2i &massCenter1, const cv::P
     return CosOfAngle;
 }
 
-int MovementCalculation::findDistanceToDestination(const cv::Point2i &averageCenter, const cv::Point2i &destination)
+int Detector::findDistanceToDestination(const cv::Point2i &averageCenter, const cv::Point2i &destination)
 {
     int distanceInPixel = sqrt(pow((averageCenter.x - destination.x),2) + pow((averageCenter.y - destination.y),2));
     return distanceInPixel;

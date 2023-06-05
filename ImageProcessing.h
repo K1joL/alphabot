@@ -18,16 +18,11 @@ class Color
         double &operator[](int index) { return color_[index]; }
 };
 
-class MovementCalculation
+class Detector
 {
     public:
         float findAngle(const cv::Point2i &massCenter1, const cv::Point2i &massCenter2, const cv::Point2i &massCenter3);
         int findDistanceToDestination(const cv::Point2i &averageCenter, const cv::Point2i &destination);
-};
-
-class Detector
-{
-    public:
         cv::Mat TakeThresholdOfBlob(const cv::Mat &frameHSV, Color Color);
         cv::Rect detectBlob(cv::Mat &frame, const cv::Mat &threshold);
         cv::Point2i SteppedDetection(cv::Mat &frame, Color colorHSV);

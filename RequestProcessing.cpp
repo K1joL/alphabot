@@ -43,7 +43,6 @@ void Controller::Move(int distance)
 
 void Controller::Rotate(float cosOfAngle)
 {
-    // const char* cmd = ChooseTheCommand(cosOfAngle);
     const char* cmd = "right";
     myMosq::MqttMessage mes{cmd, 1.0};
     mosq_->Publish(&mes);
@@ -58,7 +57,7 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
 {
     mosq_ = std::make_shared<myMosq>("localhost", "/telega", "abot/command/alex");
     Detector detector;
-    float cosOfAngle = 0;
+    float angle = 0;
     int distance = 0;
     cv::namedWindow("result", cv::WINDOW_NORMAL);
 
@@ -119,21 +118,20 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
             // Detecting robot
             bot_.head = detector.SteppedDetection(frame, headColorHsv_);
             bot_.tail = detector.SteppedDetection(frame, tailColorHsv_);
-            cv::Point2i massCenterAverage = detector.GetMassCenter(bot_.head, bot_.tail);
+            cv::Point2i botCenter = detector.GetMassCenter(bot_.head, bot_.tail);
 
             // Setting destination
             currentRequest.SetDestination(detector.SteppedDetection(frame, currentRequest.GetColor()));
             std::cout << currentRequest.GetDestination() << std::endl;
             std::cout << "Bot: H: " << bot_.head << " T: " << bot_.tail << std::endl;
 
-            MovementCalculation moveBot;
-            cosOfAngle = moveBot.findAngle(bot_.head, massCenterAverage, currentRequest.GetDestination());
-            distance = moveBot.findDistanceToDestination(massCenterAverage, currentRequest.GetDestination());
-            std::cout << "Angle : " << cosOfAngle << " Distance: " << distance << std::endl;
+            angle = acos(detector.findAngle(botCenter, bot_.head, currentRequest.GetDestination()));
+            distance = detector.findDistanceToDestination(botCenter, currentRequest.GetDestination());
+            std::cout << "Angle : " << angle << " Distance: " << distance << std::endl;
 
             // draw angle lines
-            line(frame, static_cast<cv::Point>(bot_.head), static_cast<cv::Point>(massCenterAverage), (255, 0, 0));
-            line(frame, static_cast<cv::Point>(massCenterAverage), static_cast<cv::Point>(currentRequest.GetDestination()), (0, 255, 0));
+            line(frame, static_cast<cv::Point>(bot_.head), static_cast<cv::Point>(botCenter), (255, 0, 0));
+            line(frame, static_cast<cv::Point>(botCenter), static_cast<cv::Point>(currentRequest.GetDestination()), (0, 255, 0));
 
             cv::resize(frame, frame, cv::Size(frame.cols/3,frame.rows/3));
             cv::imshow("result", frame);
@@ -141,8 +139,8 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
 
             // Deviation for if`s
             float errorAngle = 15;
-            float angle = acos(cosOfAngle) * 180 / M_PIf;
-            int errorDist = 100;
+            angle = angle * 180 / M_PIf;
+            int errorDist = 200;
             if ( angle > errorAngle )
             {
                 state_ = States::Rotate;
@@ -169,9 +167,9 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
             break;
 
         case States::Rotate:
-            std::cout << "Rotating to " << atan(cosOfAngle) * 180 / M_PIf << std::endl;
+            std::cout << "Rotating to " << angle * 180 / M_PIf << std::endl;
             state_ = DoDeliver;
-            controller->Rotate(cosOfAngle);
+            controller->Rotate(angle);
             break;
 
         case States::Waiting:
