@@ -47,9 +47,7 @@ cv::Mat Detector::TakeThresholdOfBlob(const cv::Mat &frameHSV, Color color)
 
     //Make result image matrix with found color
     inRange(frameHSV, HsvMin, HsvMax, threshold);
-    //Creating the image in white&black with area of needed color 
-    // cv::imshow( "FrameResult.jpg", threshold );
-    // cv::waitKey(1000);
+    //Creating the image in white&black with area of needed color
     return threshold;
 }
 
@@ -71,7 +69,6 @@ cv::Rect Detector::detectBlob(cv::Mat &frame, const cv::Mat &threshold)
         if(area > minArea)
         {
             rectangle = minRect[i].boundingRect();
-            //Uncomment if you want to see Rectangles on image
             cv::Point2f rect_points[4];
             minRect[i].points( rect_points );
             for ( int j = 0; j < 4; j++ )
@@ -80,8 +77,6 @@ cv::Rect Detector::detectBlob(cv::Mat &frame, const cv::Mat &threshold)
             }
         }
     }
-    // imshow("result", threshold);
-    // waitKey();
     return rectangle;
 }
 

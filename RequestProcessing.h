@@ -10,20 +10,7 @@
 
 const double PIXELS_PER_SECOND = 100;
 
-enum class TypesOfRequest{
-    System = -1, 
-    None = 0, 
-    Deliver
-    };
 
-enum States{
-        Running = 1,
-        DoDeliver,
-        Move,
-        Rotate,
-        Waiting,
-        Disabling
-    };
 
 struct AlphaBot
         {
@@ -33,6 +20,13 @@ struct AlphaBot
 
 class Request
 {
+    public:
+    enum TypesOfRequest{
+        System = -1, 
+        None = 0, 
+        Deliver
+        };
+        
     private:
         cv::Point2i destination_ {0,0};
         TypesOfRequest type_;
@@ -58,6 +52,14 @@ class Request
 
 class Controller
 {
+    enum States{
+            Running = 1,
+            DoDeliver,
+            Move,
+            Rotate,
+            Waiting,
+            Disabling
+        };
     private:
         Color tailColorHsv_{110, 140, 100};
         Color headColorHsv_{160, 140, 100};
@@ -66,14 +68,12 @@ class Controller
         AlphaBot bot_;
 
     public:
-        void MakeRequest(Request &req, Color colorPuf, TypesOfRequest type);
+        void MakeRequest(Request &req, Color colorPuf, Request::TypesOfRequest type);
         void FinishRequest(Request &req);
         void Move(int distance);
         void Rotate(float angle);
         void GoHome();
         void FiniteAutomate(cv::VideoCapture &cap);
-        const char *ChooseTheCommand(int distance);
-        const char *ChooseTheCommand(float cosOfAngle);
 };
 
 #endif

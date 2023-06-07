@@ -1,5 +1,7 @@
 #include "RequestProcessing.h"
-        #include <string.h>
+#include <string.h>
+
+using TypesOfRequest = Request::TypesOfRequest;
 
 void Request::SetColor(double hue, double saturation, double value)
 {
@@ -10,9 +12,7 @@ void Request::SetColor(double hue, double saturation, double value)
 
 void Request::SetDestination(cv::Point2i point)
 {
-
-    if (!this->destination_.x || !this->destination_.y)
-        this->destination_ = point;
+    this->destination_ = point;
 }
 
 Request &Request::operator=(Request &req)
@@ -35,9 +35,8 @@ void Controller::FinishRequest(Request &req)
 
 void Controller::Move(int distance)
 {
-    const char *cmd = ChooseTheCommand(distance);
+    const char *cmd = "forward";
     myMosq::MqttMessage mes{cmd, (1.0)};
-    
     mosq_->Publish(&mes);
 }
 
@@ -89,8 +88,7 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
             }
             else if (c == 'e')
             {
-                isOn = false;
-                break;
+                state_ = Disabling;
             }
 
             if (currentRequest.GetType() == TypesOfRequest::System)
@@ -101,15 +99,15 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
                 controller->GoHome();
             break;
         }
+        case States::Disabling:
+            isOn = false;
+            break;
 
         case States::DoDeliver:
         {
             cv::Mat frame;
             // Capture frame-by-frame
             cap >> frame;
-            // std::string base = "target.png";
-            // std::string file = base;
-            // frame = cv::imread(file.insert(6, std::to_string(i)));
 
             // If the frame is empty, break immediately
             if (frame.empty())
@@ -121,7 +119,9 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
             cv::Point2i botCenter = detector.GetMassCenter(bot_.head, bot_.tail);
 
             // Setting destination
-            currentRequest.SetDestination(detector.SteppedDetection(frame, currentRequest.GetColor()));
+            
+            if (!currentRequest.GetDestination().x || !currentRequest.GetDestination().y)
+                currentRequest.SetDestination(detector.SteppedDetection(frame, currentRequest.GetColor()));
             std::cout << currentRequest.GetDestination() << std::endl;
             std::cout << "Bot: H: " << bot_.head << " T: " << bot_.tail << std::endl;
 
@@ -186,37 +186,4 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
         }
     }
     cv::destroyAllWindows;
-}
-
-const char *Controller::ChooseTheCommand(int distance)
-{
-    return "forward";
-}
-
-const char *Controller::ChooseTheCommand(float cosOfAngle)
-{
-    if (cosOfAngle > 0)
-    {
-        if (bot_.tail.x < bot_.head.x)
-            if (bot_.tail.y < bot_.head.y)
-                return "left";
-            else
-                return "right";
-        else if (bot_.tail.y > bot_.head.y)
-            return "left";
-        else
-            return "right";
-    }
-    else
-    {
-        if (bot_.tail.x < bot_.head.x)
-            if (bot_.tail.y > bot_.head.y)
-                return "left";
-            else
-                return "right";
-        else if (bot_.tail.y < bot_.head.y)
-            return "left";
-        else
-            return "right";
-    }
 }
