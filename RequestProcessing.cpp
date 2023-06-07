@@ -89,6 +89,7 @@ void Controller::FiniteAutomate(cv::VideoCapture &cap)
             else if (c == 'e')
             {
                 state_ = Disabling;
+                break;
             }
 
             if (currentRequest.GetType() == TypesOfRequest::System)
