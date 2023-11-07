@@ -1,28 +1,30 @@
-#include "Mqtt.h"
+#include "mqtt.h"
+#include <iostream>
+#include <string.h>
 
-void myMosq::on_connect(int rc)
+void MyMosquitto::on_connect(int rc)
 {
     if (rc != 0)
     {
-        fprintf(stderr, "Connect failed\n");
+        std::cout << stderr << "Connect failed\n";
     }
     else
     {
-        isConnected_ = true;
+        isConnected = true;
     }
 }
 
-void myMosq::on_subscribe(int mid, int qos_count, const int *granted_qos)
+void MyMosquitto::on_subscribe(int mid, int qos_count, const int *granted_qos)
 {
-    isSubscribed_ = true;
+    isSubscribed = true;
 }
 
-void myMosq::on_message(const struct mosquitto_message *msg)
+void MyMosquitto::on_message(const mosquitto_message *msg)
 {
     std::string RecievedMsg = static_cast<std::string>(static_cast<char *>(msg->payload));
     if (RecievedMsg.compare("exit") != 0)
     {
-        std::vector<double> colorTemp;
+        std::vector<uint8_t> color;
         std::string temp = "";
         for (int i = 0; i < RecievedMsg.length(); i++)
         {
@@ -33,7 +35,7 @@ void myMosq::on_message(const struct mosquitto_message *msg)
                 {
                     if (RecievedMsg[i] == ',')
                     {
-                        colorTemp.push_back(stod(temp));
+                        color.push_back(stod(temp));
                         temp = "";
                         i++;
                         continue;
@@ -41,42 +43,46 @@ void myMosq::on_message(const struct mosquitto_message *msg)
                     temp += RecievedMsg[i];
                     i++;
                 }
-                colorTemp.push_back(stod(temp));
+                color.push_back(stod(temp));
                 break;
             }
         }
-        colorRequest_ = move(colorTemp);
+        m_colorQueue.push(color);
     }
     else
-        isRunning_ = false;
+        isRunning = false;
 
     fflush(stdout);
 }
 
-void myMosq::Subscribe()
+std::vector<uint8_t> MyMosquitto::GetNextColor()
 {
-    printf( ">> Robot Online <<\n" );
+    std::vector<uint8_t> temp = move(m_colorQueue.front());
+    m_colorQueue.pop();
+    return temp;
+}
 
+void MyMosquitto::Subscribe()
+{
     if (connect_async(MQTT_SERVER, MQTT_PORT, KEEP_ALIVE)) 
     {
-        fprintf( stderr, "Unable to connect.\n" );
+        std::cout << stderr << "Unable to connect.\n";
         return ;
     }
 
-    while (!isConnected_) 
+    while (!isConnected) 
     {
 		usleep(100000);
     }
     
     subscribe( NULL, MQTT_SUB_TOPIC);
     
-    while (!isSubscribed_) 
+    while (!isSubscribed) 
     {
 		usleep(100000);
     }
 
-
-    while(isRunning_) 
+    while(isRunning) 
     {
         usleep(100000);
     }
@@ -84,25 +90,24 @@ void myMosq::Subscribe()
     return ;
 }
 
-
-void myMosq::SendToServer(const char *data)
+void MyMosquitto::SendToServer(const char *data)
 {
     connect_async(MQTT_SERVER, MQTT_PORT, KEEP_ALIVE);
-    publish(NULL, MQTT_PUB_TOPIC, strlen(data), data, 0, 0);
+    publish(NULL, MQTT_PUB_TOPIC, strlen(data), data);
 }
 
-void *myMosq::Publish(const MqttMessage* message)
+void MyMosquitto::Publish(const Message &message)
 {
     json_object *json_obj;
     json_obj = json_tokener_parse("{}");
     const char *json_str;
-
-    json_object_object_add(json_obj, "cmd", json_object_new_string(message->command));
-    json_object_object_add(json_obj, "val", json_object_new_double(message->seconds));
-    json_object_object_add(json_obj, "spd", json_object_new_double(0.6));
+    
+    json_object_object_add(json_obj, "cmd", json_object_new_string(message.command));
+    json_object_object_add(json_obj, "val", json_object_new_double(message.value));
+    json_object_object_add(json_obj, "spd", json_object_new_double(message.speed));
 
     json_str = json_object_get_string(json_obj);
     SendToServer(json_str);
 
-    return NULL;
+    return ;
 }

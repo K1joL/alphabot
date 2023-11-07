@@ -1,1 +1,0 @@
-/usr/bin/c++ -rdynamic CMakeFiles/pub.dir/Pub.cpp.o CMakeFiles/pub.dir/Subscriber.cpp.o -o pub  /usr/lib/x86_64-linux-gnu/libjson-c.so.5.1.0 -lmosquitto 

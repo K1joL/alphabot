@@ -1,3 +1,0 @@
-/home/k1jol/alphabotMqttPub/build/CMakeFiles/pub.dir
-/home/k1jol/alphabotMqttPub/build/CMakeFiles/edit_cache.dir
-/home/k1jol/alphabotMqttPub/build/CMakeFiles/rebuild_cache.dir
