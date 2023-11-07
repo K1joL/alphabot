@@ -1,60 +1,66 @@
-#ifndef SUBSCRIBER_H
-#define SUBSCRIBER_H
+#ifndef MYMQTT_H
+#define MYMQTT_H
 
-#include <cstring>
-#include <string>
 #include <stdio.h>
+#include <unistd.h>
 #include <mosquittopp.h>
 #include <json-c/json.h>
-#include <unistd.h>
+#include <queue>
 #include <vector>
 
-class myMosq : public mosqpp::mosquittopp
+class MyMosquitto : public mosqpp::mosquittopp
 {
-public:
-    struct MqttMessage
-    {
-        const char *command;
-        double seconds;
-    };
-
 private:
-    const char *MQTT_SERVER = "localhost";
-    const char *MQTT_SUB_TOPIC = "/telega";
-    const char *MQTT_PUB_TOPIC = "abot/command/alex";
+    const char* MQTT_SERVER = "localhost";
     int KEEP_ALIVE = 60;
     int MQTT_PORT = 1883;
+    const char *MQTT_SUB_TOPIC = "tgbot/request";
+    const char *MQTT_PUB_TOPIC = "abot/command/alex";
 
-    std::vector<double> colorRequest_;
-
-    bool isConnected_ = false;
-    bool isSubscribed_ = false;
-    bool isRunning_ = true;
-    bool inProcess_ = true;
+    //Переменные состояния
+    bool isConnected = false;
+    bool isSubscribed = false;
+    bool isRunning = true;
+    bool inProcess = true;
 
     virtual void on_connect(int rc);
     virtual void on_subscribe(int mid, int qos_count, const int *granted_qos);
     virtual void on_message(const struct mosquitto_message *msg);
+    
+    //Очередь цветов запросов
+    std::queue<std::vector<uint8_t>> m_colorQueue;
 
 public:
-    myMosq(const char* mqttServer, const char* mqttSubTopic, const char* mqttPubTopic, const char *id = NULL, bool clean_session = true)
-     : mosquittopp(id, clean_session),
-        MQTT_SERVER{mqttServer}, MQTT_SUB_TOPIC{mqttSubTopic}, MQTT_PUB_TOPIC{mqttPubTopic}
+    struct Message
+    {
+        const char* command;
+        double value;
+        double speed;
+    };
+
+public:
+    MyMosquitto(const char *mqttServer, const char *mqttSubTopic, const char *mqttPubTopic,
+                const char *id = NULL, bool clean_session = true)
+        : mosquittopp(id, clean_session),
+          MQTT_SERVER{mqttServer}, MQTT_SUB_TOPIC{mqttSubTopic}, MQTT_PUB_TOPIC{mqttPubTopic}
     {
         mosqpp::lib_init();
         loop_start();
     }
 
-    ~myMosq()
+    ~MyMosquitto()
     {
         loop_stop(true);
         mosqpp::lib_cleanup();
     }
-
+    //Returns true if the queue is empty.
+    bool QueueEmpty() {return m_colorQueue.empty(); }
+    std::vector<uint8_t> GetNextColor();
     void Subscribe();
-    void SendToServer(const char *data);
-    void *Publish(const MqttMessage* message);
-    std::vector<double> GetMessage() const { return colorRequest_; }
+    void SendToServer(const char* data);
+    void Publish(const Message &message);
+
 };
 
-#endif
+
+#endif //MYMQTT_H
